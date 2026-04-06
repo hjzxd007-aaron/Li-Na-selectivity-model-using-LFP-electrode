@@ -1,0 +1,126 @@
+function [theta_Li_new, theta_Na_new] = solve_theta_diffusion_all( ...
+    theta_Li_last, theta_Na_last, ...
+    R_Li, R_Na, ...
+    D_in_Li, D_in_Na, ...
+    C_max, a_v, r_p, dx, dt, N, n_sub, k)
+% ========================================================================
+% solve_theta_diffusion_all
+% ------------------------------------------------------------------------
+% Radial diffusion solver for competitive Li+/Na+ intercalation in a
+% spherical particle using a finite-volume discretization.
+%
+% Governing equation:
+%   ∂θ/∂t = (D_in / r_p^2) · [1/ξ^2 · ∂/∂ξ ( ξ^2 · ∂θ/∂ξ )]
+% where ξ = r / r_p is the dimensionless radial coordinate.
+%
+% Boundary conditions:
+%   Center (ξ = 0):     ∂θ/∂ξ = 0   (symmetry condition)
+%   Surface (ξ = 1):   -D_in ∂θ/∂ξ = R / (a_v · C_max)
+%                      (flux continuity with interfacial reaction)
+%
+% Numerical method:
+%   - Finite-volume spatial discretization
+%   - Explicit time stepping with sub-stepping for stability
+%
+% Inputs:
+%   theta_Li_last, theta_Na_last  - Previous concentration profiles (N+1 × 1)
+%   R_Li, R_Na                    - Interfacial reaction rates (mol m⁻³ s⁻¹)
+%   D_in_Li, D_in_Na              - Solid-phase diffusivities (m² s⁻¹)
+%   C_max                         - Maximum site concentration (mol m⁻³)
+%   a_v                           - Specific surface area (m⁻¹)
+%   r_p                           - Particle radius (m)
+%   dx                            - Dimensionless spatial step
+%   dt                            - Time step (s)
+%   N                             - Number of radial grid points
+%   n_sub                         - Number of sub-time steps
+%   k                             - Site occupation coefficient for Na⁺
+%
+% Outputs:
+%   theta_Li_new, theta_Na_new    - Updated concentration profiles
+% ========================================================================
+
+    % ---------------- Grid definition ----------------
+    xr = dx * (0:N)';                          % node positions (dimensionless)
+    xr_mid = 0.5 * (xr(1:end-1) + xr(2:end));  % control volume interfaces
+
+    % ---------------- Dimensionless time step ----------------
+    dt_Li_hat = D_in_Li * dt / r_p^2 / n_sub;
+    dt_Na_hat = D_in_Na * dt / r_p^2 / n_sub;
+
+    % ---------------- Initialization ----------------
+    theta_Li_new = theta_Li_last;
+    theta_Na_new = theta_Na_last;
+
+    % ====================================================================
+    % Sub-time stepping loop
+    % ====================================================================
+    for step = 1:n_sub
+
+        % ================================================================
+        % Li⁺ diffusion update
+        % ================================================================
+        theta_Li_temp = zeros(N+1, 1);
+
+        % Center boundary (symmetry)
+        theta_Li_temp(1) = theta_Li_new(2);
+
+        % Surface boundary (flux continuity)
+        flux_Li = -R_Li / (a_v * C_max);
+        theta_Li_temp(N+1) = theta_Li_new(N) + flux_Li * r_p / D_in_Li * dx;
+
+        % Internal nodes
+        for i = 2:N
+            xi = xr(i);
+
+            diff_term = (xr_mid(i))^2 * (theta_Li_new(i+1) - theta_Li_new(i)) ...
+                      - (xr_mid(i-1))^2 * (theta_Li_new(i) - theta_Li_new(i-1));
+
+            theta_Li_temp(i) = theta_Li_new(i) + ...
+                dt_Li_hat / xi^2 / dx^2 * diff_term;
+        end
+
+        theta_Li_new = theta_Li_temp;
+
+        % ================================================================
+        % Na⁺ diffusion update
+        % ================================================================
+        theta_Na_temp = zeros(N+1, 1);
+
+        % Center boundary
+        theta_Na_temp(1) = theta_Na_new(2);
+
+        % Surface boundary
+        flux_Na = -R_Na / (a_v * C_max);
+        theta_Na_temp(N+1) = theta_Na_new(N) + flux_Na * r_p / D_in_Na * dx;
+
+        % Internal nodes
+        for i = 2:N
+            xi = xr(i);
+
+            diff_term = (xr_mid(i))^2 * (theta_Na_new(i+1) - theta_Na_new(i)) ...
+                      - (xr_mid(i-1))^2 * (theta_Na_new(i) - theta_Na_new(i-1));
+
+            theta_Na_temp(i) = theta_Na_new(i) + ...
+                dt_Na_hat / xi^2 / dx^2 * diff_term;
+        end
+
+        theta_Na_new = theta_Na_temp;
+
+    end
+
+    % ====================================================================
+    % Numerical safeguards
+    % ====================================================================
+
+    % Enforce non-negativity
+    theta_Li_new = max(theta_Li_new, 0);
+    theta_Na_new = max(theta_Na_new, 0);
+
+    % Diagnostic check for weighted site occupancy
+    tol_occ = 1e-8;
+    if any(theta_Li_new + k * theta_Na_new > 1 + tol_occ)
+        warning(['Weighted site occupancy exceeds unity beyond tolerance ', ...
+                 'during particle diffusion update.']);
+    end
+
+end

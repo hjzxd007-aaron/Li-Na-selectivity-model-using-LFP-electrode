@@ -1,0 +1,233 @@
+clc; clear; close all;
+
+%% ========================================================================
+%  CONSTANTS AND PARAMETERS
+% ========================================================================
+
+F_const = 96485;              % Faraday constant (C/mol)
+C_max   = 3000;               % Maximum intercalation concentration (mol/m^3)
+c0      = 1000;               % Reference concentration (mol/m^3)
+
+R = 8.314;                    % Gas constant (J/mol/K)
+T = 298;                      % Temperature (K)
+V_T = R * T / F_const;        % Thermal voltage (V)              
+
+%% ========================================================================
+%  FRUMKIN PARAMETERS
+% ========================================================================
+
+E_Li_ref = 0.1;
+g_Li     = -0.102;
+E_Na_ref = -0.11;
+g_Na     = 0.0846;
+
+k = 1.63;                     % Site competition coefficient
+
+%% ========================================================================
+%  SYSTEM GEOMETRY
+% ========================================================================
+
+V_elec   = 1e-6;              % Electrode volume (m^3)
+V_sp_feed = 100000000e-6; % Spacer volume (m^3)
+
+%% ========================================================================
+%  INITIAL CONDITIONS
+% ========================================================================
+
+theta_Li_0 = 1e-4;
+theta_Na_0 = 1e-4;
+
+%% ========================================================================
+%  USER-DEFINED PARAMETER SWEEP
+% ========================================================================
+
+g_cross_list = [0, -0.1, -0.2, -0.3, -0.4, -0.5];   % Cross-interaction parameter
+ratio_list   = [1,2,10,20,100,200,1000,2000,5000,10000,20000];        % Na/Li ratio
+
+target_theta = 0.99;  % Target total occupation (dimensionless)
+
+%% ========================================================================
+%  STORAGE MATRICES
+% ========================================================================
+
+thetaLi_matrix = NaN(length(g_cross_list), length(ratio_list));
+thetaNa_matrix = NaN(length(g_cross_list), length(ratio_list));
+selectivity_matrix = zeros(length(g_cross_list), length(ratio_list));
+
+% Target charge (approximate)
+dq_target = target_theta * F_const * V_elec * C_max;
+
+fprintf('\nStarting parametric analysis...\n');
+fprintf('Number of g_cross values: %d\n', length(g_cross_list));
+fprintf('Number of ratios: %d\n', length(ratio_list));
+fprintf('Total simulations: %d\n\n', length(g_cross_list)*length(ratio_list));
+
+%% ========================================================================
+%  PARAMETRIC SWEEP
+% ========================================================================
+
+for g_idx = 1:length(g_cross_list)
+    
+    g_cross = g_cross_list(g_idx);
+    
+    for r_idx = 1:length(ratio_list)
+        
+        ratio = ratio_list(r_idx);
+        
+        fprintf('[%d/%d] g_cross = %.3f, ratio = %.1f ... ', ...
+            (g_idx-1)*length(ratio_list)+r_idx, ...
+            length(g_cross_list)*length(ratio_list), ...
+            g_cross, ratio);
+        
+        % Feed concentrations
+        C_sp_Na_feed = 500;
+        C_sp_Li_feed = C_sp_Na_feed / ratio;
+        
+        % Initial solid concentrations
+        C_s_Li_0 = theta_Li_0 * C_max;
+        C_s_Na_0 = theta_Na_0 * C_max;
+        
+        % Solver settings
+        options = optimoptions('fsolve', ...
+            'Display', 'off', ...
+            'MaxIterations', 1000, ...
+            'TolFun', 1e-10);
+        
+        %% ================================================================
+        %  EQUATION SYSTEM
+        % ================================================================
+        
+        eqns = @(x) [
+            
+            % Mass balance (Li)
+            C_sp_Li_feed * V_sp_feed + C_s_Li_0 * V_elec ...
+            - x(3) * V_sp_feed - x(1) * V_elec;
+            
+            % Mass balance (Na)
+            C_sp_Na_feed * V_sp_feed + C_s_Na_0 * V_elec ...
+            - x(4) * V_sp_feed - x(2) * V_elec;
+            
+            % Charge balance (total intercalation)
+            dq_target - F_const * V_elec * ...
+            ((x(1) - C_s_Li_0) + (x(2) - C_s_Na_0));
+            
+            % Equilibrium condition (Frumkin potential equality)
+            (E_Li_ref - V_T * log(max(x(1),1e-6) / ...
+             (max(C_max - x(1) - k*x(2),1e-6) * max(x(3),1e-6) / c0)) ...
+             - g_Li * (x(1)/C_max) ...
+             - g_cross * (k*x(2)/C_max)) ...
+             
+            - ...
+            
+            (E_Na_ref - V_T * log(max(k*x(2),1e-6) / ...
+             (max(C_max - x(1) - k*x(2),1e-6) * max(x(4),1e-6) / c0)) ...
+             - g_Na * (k*x(2)/C_max) ...
+             - g_cross * (x(1)/C_max))
+        ];
+        
+        %% ================================================================
+        %  INITIAL GUESS
+        % ================================================================
+        
+        delta_theta = target_theta / 2;
+        
+        initial_guess = [
+            C_s_Li_0 + delta_theta * C_max * 0.8;
+            C_s_Na_0 + delta_theta * C_max * 0.2;
+            C_sp_Li_feed * 0.95;
+            C_sp_Na_feed * 0.95
+        ];
+        
+        %% ================================================================
+        %  SOLVER
+        % ================================================================
+        
+        try
+            [sol, ~, exitflag] = fsolve(eqns, initial_guess, options);
+            
+            if exitflag > 0 && sol(1) > 0 && sol(2) > 0
+                
+                C_s_Li_1 = sol(1);
+                C_s_Na_1 = sol(2);
+                
+                thetaLi_matrix(g_idx, r_idx) = C_s_Li_1 / C_max;
+                thetaNa_matrix(g_idx, r_idx) = C_s_Na_1 / C_max;
+                
+                % Selectivity calculation
+                delta_Li = C_s_Li_1 - C_s_Li_0;
+                delta_Na = C_s_Na_1 - C_s_Na_0;
+                
+                if abs(delta_Na) > 1e-10
+                    S = (delta_Li / C_sp_Li_feed) / ...
+                        (delta_Na / C_sp_Na_feed);
+                    selectivity_matrix(g_idx, r_idx) = abs(S);
+                    fprintf('Selectivity = %.2f\n', abs(S));
+                else
+                    selectivity_matrix(g_idx, r_idx) = 1e6;
+                    fprintf('Selectivity > 1e6 (Na negligible)\n');
+                end
+                
+            else
+                selectivity_matrix(g_idx, r_idx) = NaN;
+                fprintf('Solver failed\n');
+            end
+            
+        catch
+            selectivity_matrix(g_idx, r_idx) = NaN;
+            fprintf('Error encountered\n');
+        end
+    end
+end
+
+fprintf('\nComputation completed.\n\n');
+
+%% ========================================================================
+%  EXPORT RESULTS TO EXCEL
+% ========================================================================
+
+filename = 'selectivity_g_cross_ratio_analysis.xlsx';
+
+tbl_S = array2table([g_cross_list', selectivity_matrix], ...
+    'VariableNames', ['g_cross', ...
+    arrayfun(@(x) sprintf('ratio_%g', x), ratio_list, 'UniformOutput', false)]);
+
+writetable(tbl_S, filename, 'Sheet', 'Selectivity');
+
+tbl_tLi = array2table([g_cross_list', thetaLi_matrix], ...
+    'VariableNames', tbl_S.Properties.VariableNames);
+
+writetable(tbl_tLi, filename, 'Sheet', 'Theta_Li');
+
+tbl_tNa = array2table([g_cross_list', thetaNa_matrix], ...
+    'VariableNames', tbl_S.Properties.VariableNames);
+
+writetable(tbl_tNa, filename, 'Sheet', 'Theta_Na');
+
+fprintf('Results saved to: %s\n\n', filename);
+
+%% ========================================================================
+%  PLOTTING
+% ========================================================================
+
+figure('Position', [100,100,800,500]);
+colors = lines(length(g_cross_list));
+
+hold on;
+for g_idx = 1:length(g_cross_list)
+    plot(ratio_list, selectivity_matrix(g_idx,:), '-o', ...
+        'LineWidth', 2, ...
+        'MarkerSize', 8, ...
+        'Color', colors(g_idx,:), ...
+        'DisplayName', sprintf('g_{cross}=%.3f', g_cross_list(g_idx)));
+end
+
+set(gca, 'XScale', 'log');
+xlabel('Li/Na ratio');
+ylabel('Selectivity (Li/Na)');
+legend('Location','northwest');
+grid on;
+
+title('Selectivity vs Li/Na Ratio');
+hold off;
+
+fprintf('Plot generated successfully.\n');

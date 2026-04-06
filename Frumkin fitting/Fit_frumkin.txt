@@ -1,0 +1,210 @@
+clc; clear; close all;
+
+%% ========================================================================
+%  USER CONFIGURATION
+% ========================================================================
+
+fname = 'Capacity_LFP_NaCl.txt';
+
+% Candidate column names (case-insensitive matching supported)
+colnames_theta_candidates = ["theta","Theta","THETA"];
+colnames_capacity_candidates = ["capacity","Capacity","cap","Q","Q_mAh_g","Capacity(mAh/g)","Capacity_mAh_g"];
+colnames_E_candidates = ["E/V","Ewe","E","Voltage","Ewe(V)"];
+
+% Maximum capacity for normalization (mAh g^-1)
+% If empty ([]), the maximum value in the dataset will be used
+C_max_manual = 135;
+
+% Valid theta range (exclude near 0 and near saturation)
+theta_min = 1e-4;
+theta_max = 0.999;
+
+% Number of points retained for fitting
+n = 200;
+
+% Fixed parameter k (not fitted)
+k_fixed = 1.63;
+
+%% ========================================================================
+%  DATA IMPORT
+% ========================================================================
+
+data = readtable(fname, 'VariableNamingRule', 'preserve');
+
+% Extract potential column
+E = try_get_column(data, colnames_E_candidates);
+if isempty(E)
+    error('Potential column not found. Please check column names.');
+end
+
+% Extract theta or capacity
+theta = try_get_column(data, colnames_theta_candidates);
+capacity_original = [];
+
+if isempty(theta)
+    capacity = try_get_column(data, colnames_capacity_candidates);
+    
+    if isempty(capacity)
+        error('Neither theta nor capacity column found.');
+    end
+    
+    capacity_original = capacity;
+    
+    % Determine C_max
+    if ~isempty(C_max_manual)
+        C_max = C_max_manual;
+    else
+        C_max = max(capacity(~isnan(capacity)));
+        fprintf('C_max automatically set to %.6g\n', C_max);
+    end
+    
+    % Normalize to obtain theta
+    theta = capacity ./ C_max;
+else
+    C_max = NaN; %#ok<NASGU>
+end
+
+%% ========================================================================
+%  DATA FILTERING AND SAMPLING
+% ========================================================================
+
+valid = ~isnan(theta) & ~isnan(E) & theta >= theta_min & theta <= theta_max;
+
+theta_all = theta(valid);
+E_all = E(valid);
+
+if ~isempty(capacity_original)
+    capacity_all = capacity_original(valid);
+else
+    capacity_all = theta_all * C_max_manual;
+end
+
+if numel(theta_all) < 2
+    error('Insufficient valid data points after filtering.');
+end
+
+% Uniform subsampling
+if numel(theta_all) <= n
+    theta_valid = theta_all;
+    E_valid = E_all;
+    capacity_valid = capacity_all;
+    warning('Number of data points is less than %d; using all points.', n);
+else
+    idx = round(linspace(1, numel(theta_all), n));
+    theta_valid = theta_all(idx);
+    E_valid = E_all(idx);
+    capacity_valid = capacity_all(idx);
+end
+
+%% ========================================================================
+%  FRUMKIN-LANGMUIR FITTING
+% ========================================================================
+
+fit_eqn = fittype( ...
+    'E_ref - 0.0257*(log(k*theta/(1-k*theta))) + 0.0257*log(1) - g_i*(k*theta)', ...
+    'independent','theta', ...
+    'coefficients',{'E_ref','g_i'}, ...
+    'problem','k');
+
+opts = fitoptions('Method','NonlinearLeastSquares');
+opts.StartPoint = [0.15, 0.0];
+opts.Lower = [-1, -1];
+opts.Upper = [1, 3];
+
+[fitted_curve, gof] = fit(theta_valid, E_valid, fit_eqn, opts, 'problem', k_fixed);
+
+% Extract fitted parameters
+E_ref = fitted_curve.E_ref;
+g_i = fitted_curve.g_i;
+R_squared = gof.rsquare;
+RMSE = gof.rmse;
+
+E_fitted = fitted_curve(theta_valid);
+
+%% ========================================================================
+%  PLOTTING
+% ========================================================================
+
+theta_dense = linspace(min(theta_valid), max(theta_valid), 1000);
+E_fit_dense = fitted_curve(theta_dense);
+
+figure;
+plot(theta_valid, E_valid, 'ro', 'DisplayName','Experimental Data'); hold on;
+plot(theta_dense, E_fit_dense, 'b-', 'DisplayName','Fitted Curve');
+xlabel('\theta');
+ylabel('E (V)');
+title('Frumkin Model Fitting');
+legend('Location','best');
+grid on;
+
+%% ========================================================================
+%  EXPORT RESULTS
+% ========================================================================
+
+output_filename = 'Frumkin_Langmuir_Results.xlsx';
+
+% Sheet 1: Data and fitting results
+data_table = table(capacity_valid, theta_valid, E_valid, E_fitted, ...
+    'VariableNames', {'Capacity_mAh_g', 'Theta', 'E_Experimental_V', 'E_Fitted_V'});
+
+writetable(data_table, output_filename, 'Sheet', 'Data_and_Fit');
+
+% Sheet 2: Fitting parameters
+param_names = {'Parameter'; 'E_ref (V)'; 'g_i'; 'k (fixed)'; 'R_squared'; 'RMSE'; 'C_max (mAh/g)'; 'Number of Points'};
+param_values = {'Value'; E_ref; g_i; k_fixed; R_squared; RMSE; C_max_manual; numel(theta_valid)};
+
+param_table = table(param_names, param_values);
+writetable(param_table, output_filename, 'Sheet', 'Fit_Parameters', 'WriteVariableNames', false);
+
+% Sheet 3: Model description
+equation_info = {
+    'Fitting Equation:', 'E = E_ref - 0.0257*ln(k*theta/(1-k*theta)) - g_i*(k*theta)';
+    '', '';
+    'Model:', 'Modified Frumkin-type expression';
+    'Parameters:', '';
+    'E_ref', 'Reference potential (V)';
+    'g_i', 'Interaction parameter';
+    'k', 'Fixed site competition parameter';
+    'theta', 'Degree of intercalation'
+};
+
+equation_table = cell2table(equation_info);
+writetable(equation_table, output_filename, 'Sheet', 'Model_Info', 'WriteVariableNames', false);
+
+fprintf('\n===== Export Completed =====\n');
+fprintf('Output file: %s\n', output_filename);
+fprintf('Fitted parameters:\n');
+fprintf('  k (fixed) = %.6f\n', k_fixed);
+fprintf('  E_ref = %.6f V\n', E_ref);
+fprintf('  g_i = %.6f\n', g_i);
+fprintf('  R^2 = %.6f\n', R_squared);
+fprintf('  RMSE = %.6f\n', RMSE);
+
+%% ========================================================================
+%  HELPER FUNCTION
+% ========================================================================
+
+function col = try_get_column(T, candidates)
+
+    col = [];
+
+    % Exact match
+    for k = 1:numel(candidates)
+        name = candidates(k);
+        if any(strcmp(T.Properties.VariableNames, name))
+            col = T.(name);
+            return;
+        end
+    end
+
+    % Fuzzy match (case-insensitive)
+    vn = string(T.Properties.VariableNames);
+    for k = 1:numel(candidates)
+        name = lower(candidates(k));
+        hit = find(contains(lower(vn), name), 1, 'first');
+        if ~isempty(hit)
+            col = T.(vn(hit));
+            return;
+        end
+    end
+end

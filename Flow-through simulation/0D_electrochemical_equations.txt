@@ -1,0 +1,107 @@
+function F = OD_electrochemical_equations_reduced(x, ...
+    k, F_const, K_Li, C_max, alpha_transfer, c0, K_Na, V_T, ...
+    v_Li, v_Na, a_v, n_Li, n_Na, E_Li_ref, g_Li, g_cross, E_Na_ref, g_Na, ...
+    I, C_Li_last, C_Na_last, dt, A_sp, V_sp, P_sp, L, ...
+    theta_Li_surface_last, theta_Na_surface_last, phi_s)
+
+% ========================================================================
+% Reduced nonlinear algebraic system for flow-through operation
+% 15 unknowns / 15 equations
+%
+% x(1)  = i_Li
+% x(2)  = i_Na
+% x(3)  = i_LOC_Li
+% x(4)  = i_LOC_Na
+% x(5)  = eta_Li
+% x(6)  = eta_Na
+% x(7)  = R_Li
+% x(8)  = R_Na
+% x(9)  = E_Li
+% x(10) = E_Na
+% x(11) = C_s_Li
+% x(12) = C_s_Na
+% x(13) = C_Li   (flow-through: spacer = macropore = bulk in cell)
+% x(14) = C_Na
+% x(15) = phi_l
+% ========================================================================
+
+% ===================== unpack =====================
+i_Li    = x(1);
+i_Na    = x(2);
+i_LOC_Li = x(3);
+i_LOC_Na = x(4);
+eta_Li  = x(5);
+eta_Na  = x(6);
+R_Li    = x(7);
+R_Na    = x(8);
+E_Li    = x(9);
+E_Na    = x(10);
+C_s_Li  = x(11);
+C_s_Na  = x(12);
+C_Li    = x(13);
+C_Na    = x(14);
+phi_l   = x(15);
+
+% ===================== protections =====================
+eps_c = 1e-12;
+
+C_s_Li = max(C_s_Li, eps_c);
+C_s_Na = max(C_s_Na, eps_c);
+C_Li   = max(C_Li, eps_c);
+C_Na   = max(C_Na, eps_c);
+
+vacancy = max(C_max - C_s_Li - k*C_s_Na, eps_c);
+
+F = zeros(15,1);
+
+% ===================== (1-2) exchange current =====================
+F(1) = i_Li - F_const*K_Li * ...
+    (vacancy/C_max)^alpha_transfer * ...
+    (C_s_Li/C_max)^(1-alpha_transfer) * ...
+    (C_Li/c0)^alpha_transfer;
+
+F(2) = i_Na - F_const*K_Na * ...
+    (vacancy/C_max)^alpha_transfer * ...
+    (k*C_s_Na/C_max)^(1-alpha_transfer) * ...
+    (C_Na/c0)^alpha_transfer;
+
+% ===================== (3-4) BV kinetics =====================
+F(3) = i_LOC_Li - i_Li * ...
+    (exp(alpha_transfer*eta_Li/V_T) - exp(-(1-alpha_transfer)*eta_Li/V_T));
+
+F(4) = i_LOC_Na - i_Na * ...
+    (exp(alpha_transfer*eta_Na/V_T) - exp(-(1-alpha_transfer)*eta_Na/V_T));
+
+% ===================== (5) galvanostatic constraint =====================
+F(5) = a_v * L * (i_LOC_Li + i_LOC_Na) - I;
+
+% ===================== (6-7) overpotential =====================
+F(6) = eta_Li - (V_T*(phi_s - phi_l) - E_Li);
+F(7) = eta_Na - (V_T*(phi_s - phi_l) - E_Na);
+
+% ===================== (8-9) reaction rate =====================
+F(8) = R_Li - v_Li*a_v/(n_Li*F_const)*i_LOC_Li;
+F(9) = R_Na - v_Na*a_v/(n_Na*F_const)*i_LOC_Na;
+
+% ===================== (10-11) Frumkin =====================
+F(10) = -E_Li + E_Li_ref ...
+    - V_T*(log(C_s_Li/vacancy) - log(C_Li/c0)) ...
+    - g_Li*(C_s_Li/C_max) ...
+    - g_cross*(k*C_s_Na/C_max);
+
+F(11) = -E_Na + E_Na_ref ...
+    - V_T*(log(k*C_s_Na/vacancy) - log(C_Na/c0)) ...
+    - g_Na*(k*C_s_Na/C_max) ...
+    - g_cross*(C_s_Li/C_max);
+
+% ===================== (12-13) surface constraints =====================
+F(12) = C_s_Li - theta_Li_surface_last*C_max;
+F(13) = C_s_Na - theta_Na_surface_last*C_max;
+
+% ===================== (14-15) bulk mass balances =====================
+F(14) = P_sp * V_sp * (C_Li - C_Li_last) / dt + A_sp * L * R_Li;
+F(15) = P_sp * V_sp * (C_Na - C_Na_last) / dt + A_sp * L * R_Na;
+
+F = double(F);
+
+end

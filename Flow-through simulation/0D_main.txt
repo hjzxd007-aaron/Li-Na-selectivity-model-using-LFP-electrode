@@ -1,0 +1,432 @@
+clc; clear; close all;
+
+% ========================================================================
+% PARAMETERS
+% ========================================================================
+D_Li = 1.03e-9; 
+D_Na = 1.33e-9; 
+D_Cl = 2.03e-9; %#ok<NASGU> % kept only for completeness
+
+F_const = 96485; 
+R = 8.314; 
+T = 298; 
+V_T = R*T/F_const;
+
+P_mA = 0.7; 
+P_sp = 1; 
+P_IHC = 0.1;
+L = 400e-6; 
+L_sp = 0.02; 
+C_max = 3000; 
+c0 = 1000;
+dt = 2; 
+t_max = 100*3600;
+
+g_Li = -0.102; 
+g_Na = 0.0846;
+g_cross = -0.4;
+
+E_Li_ref = 0.1; 
+E_Na_ref = -0.10956;
+k = 1.63;
+
+phi_s = 0;
+
+z_Li = 1; %#ok<NASGU>
+z_Na = 1; %#ok<NASGU>
+z_Cl = -1; %#ok<NASGU>
+
+NLR = 200;
+C_Na_0 = 500;
+C_Li_0 = C_Na_0 / NLR;
+C_Cl_0 = C_Na_0 + C_Li_0; 
+A_sp = 25e-4;
+
+
+I = -100/25*10;   % same sign convention as original code
+
+V_sp = 500e-6;
+
+alpha_transfer = 0.5;
+n_Li = 1; 
+n_Na = 1;
+v_Li = 1; 
+v_Na = 1;
+
+K_c_Li = 2e-11; 
+K_a_Li = 2e-11;
+K_Li = K_c_Li^alpha_transfer * K_a_Li^(1-alpha_transfer) * C_max;
+
+K_c_Na = 1e-11; 
+K_a_Na = 1e-11;
+K_Na = K_c_Na^alpha_transfer * K_a_Na^(1-alpha_transfer) * C_max;
+
+% ========================================================================
+% PARTICLE
+% ========================================================================
+r_p = 1e-6; 
+dr_p = 5e-8;
+N = round(r_p/dr_p); 
+dx = 1/N;
+
+D_in_Li = 5e-14; 
+D_in_Na = 1e-13;
+a_v = 3 * P_IHC / r_p;
+n_sub = 200;
+
+xr = dx*(0:N)';
+
+% ========================================================================
+% INITIALIZATION
+% ========================================================================
+theta_Li_0 = 0.001;
+C_s_Li_0 = theta_Li_0 * C_max;
+
+syms theta_Na_sym
+C_s_Na_sym = theta_Na_sym * C_max;
+
+E_Li_eq = E_Li_ref ...
+    - V_T*(log(C_s_Li_0/(C_max - C_s_Li_0 - k*C_s_Na_sym)) - log(C_Li_0/c0)) ...
+    - g_Li*(C_s_Li_0/C_max) - g_cross*(k*C_s_Na_sym/C_max);
+
+E_Na_eq = E_Na_ref ...
+    - V_T*(log(k*C_s_Na_sym/(C_max - C_s_Li_0 - k*C_s_Na_sym)) - log(C_Na_0/c0)) ...
+    - g_Na*(k*C_s_Na_sym/C_max) - g_cross*(C_s_Li_0/C_max);
+
+theta_Na_0 = double(vpasolve(E_Li_eq == E_Na_eq, theta_Na_sym, [0 1]));
+if isempty(theta_Na_0) || ~isfinite(theta_Na_0)
+    theta_Na_0 = 1e-4;
+end
+
+C_s_Na_0 = theta_Na_0 * C_max;
+
+theta_Li_profile = theta_Li_0 * ones(N+1,1);
+theta_Na_profile = theta_Na_0 * ones(N+1,1);
+
+C_Li_last = C_Li_0;
+C_Na_last = C_Na_0;
+phi_l_last = 0;
+
+% ========================================================================
+% INITIAL GUESS (15 vars)
+% ========================================================================
+x0 = [
+    0;          % 1  i_Li
+    0;          % 2  i_Na
+    I/(2*a_v*L);% 3  i_LOC_Li
+    I/(2*a_v*L);% 4  i_LOC_Na
+    -0.1;       % 5  eta_Li
+    -0.1;       % 6  eta_Na
+    0;          % 7  R_Li
+    0;          % 8  R_Na
+    E_Li_ref;   % 9  E_Li
+    E_Na_ref;   % 10 E_Na
+    C_s_Li_0;   % 11 C_s_Li
+    C_s_Na_0;   % 12 C_s_Na
+    C_Li_0;     % 13 C_Li
+    C_Na_0;     % 14 C_Na
+    phi_l_last  % 15 phi_l
+];
+
+assert(length(x0) == 15, 'x0 should have exactly 15 elements.');
+
+options = optimoptions('fsolve', ...
+    'Display', 'off', ...
+    'MaxIterations', 5000, ...
+    'MaxFunctionEvaluations', 1e6, ...
+    'FunctionTolerance', 1e-12, ...
+    'StepTolerance', 1e-12);
+
+% ========================================================================
+% STORAGE
+% ========================================================================
+time_steps = round(t_max/dt);
+
+i_Li_history      = zeros(1, time_steps);
+i_Na_history      = zeros(1, time_steps);
+i_LOC_Li_history  = zeros(1, time_steps);
+i_LOC_Na_history  = zeros(1, time_steps);
+i_far_history     = zeros(1, time_steps);
+eta_Li_history    = zeros(1, time_steps);
+eta_Na_history    = zeros(1, time_steps);
+R_Li_history      = zeros(1, time_steps);
+R_Na_history      = zeros(1, time_steps);
+E_Li_history      = zeros(1, time_steps);
+E_Na_history      = zeros(1, time_steps);
+C_s_Li_history    = zeros(1, time_steps);
+C_s_Na_history    = zeros(1, time_steps);
+C_Li_history      = zeros(1, time_steps);
+C_Na_history      = zeros(1, time_steps);
+phi_l_history     = zeros(1, time_steps);
+selectivity_history = zeros(1, time_steps);
+
+theta_Li_history  = zeros(N+1, time_steps);
+theta_Na_history  = zeros(N+1, time_steps);
+
+% ========================================================================
+% TIME EVOLUTION
+% ========================================================================
+last_valid_step = 0;
+h = waitbar(0, 'Simulation Progress...');
+
+for t = 1:time_steps
+    waitbar(t/time_steps, h, sprintf('Progress: %.1f%%', t/time_steps*100));
+
+    % surface occupancy from last diffusion step
+    theta_Li_surface_last = theta_Li_profile(end);
+    theta_Na_surface_last = theta_Na_profile(end);
+
+    eqn_handle = @(x) OD_electrochemical_equations_reduced(x, ...
+        k, F_const, K_Li, C_max, alpha_transfer, c0, K_Na, V_T, ...
+        v_Li, v_Na, a_v, n_Li, n_Na, E_Li_ref, g_Li, g_cross, E_Na_ref, g_Na, ...
+        I, C_Li_last, C_Na_last, dt, A_sp, V_sp, P_sp, L, ...
+        theta_Li_surface_last, theta_Na_surface_last, phi_s);
+
+    [x_sol, ~, exitflag] = fsolve(eqn_handle, x0, options);
+
+    if exitflag <= 0
+        warning('Solver did not converge at step %d. Retrying with perturbed x0.', t);
+        x0_try = x0 .* (1 + 0.01*randn(size(x0)));
+        [x_sol, ~, exitflag] = fsolve(eqn_handle, x0_try, options);
+    end
+
+    if exitflag <= 0 || any(isnan(x_sol)) || any(isinf(x_sol))
+        warning('Step %d still failed. Using previous x0.', t);
+        x_sol = x0;
+    end
+
+    % unpack
+    i_Li   = x_sol(1);
+    i_Na   = x_sol(2);
+    i_LOC_Li = x_sol(3);
+    i_LOC_Na = x_sol(4);
+    eta_Li = x_sol(5);
+    eta_Na = x_sol(6);
+    R_Li   = x_sol(7);
+    R_Na   = x_sol(8);
+    E_Li   = x_sol(9);
+    E_Na   = x_sol(10);
+    C_s_Li_solved = x_sol(11);
+    C_s_Na_solved = x_sol(12);
+    C_Li_solved   = x_sol(13);
+    C_Na_solved   = x_sol(14);
+    phi_l_solved  = x_sol(15);
+
+    % capacity termination check
+    total_occupation = C_s_Li_solved + k*C_s_Na_solved;
+    if total_occupation > 0.95 * C_max
+        fprintf('\nSimulation stopped at time = %.1f s (capacity %.1f%% full)\n', ...
+            (t-1)*dt, total_occupation/C_max*100);
+        break;
+    end
+
+    % =========================================================
+    % reaction-rate physical limits
+    % =========================================================
+    vacancy = C_max - C_s_Li_solved - k*C_s_Na_solved;
+
+    % Li
+    R_Li_insert_limit  = -max(vacancy,0) / dt;
+    R_Li_extract_limit = max(C_s_Li_solved,0) / dt;
+    R_Li = max(R_Li, R_Li_insert_limit);
+    R_Li = min(R_Li, R_Li_extract_limit);
+
+    % Na
+    R_Na_insert_limit  = -max(vacancy,0) / dt;
+    R_Na_extract_limit = max(C_s_Na_solved,0) / dt;
+    R_Na = max(R_Na, R_Na_insert_limit);
+    R_Na = min(R_Na, R_Na_extract_limit);
+
+    % =========================================================
+    % Step 2: intra-particle diffusion
+    % =========================================================
+    [theta_Li_new, theta_Na_new] = solve_theta_diffusion_all( ...
+        theta_Li_profile, theta_Na_profile, ...
+        R_Li, R_Na, ...
+        D_in_Li, D_in_Na, ...
+        C_max, a_v, r_p, dx, dt, N, n_sub, k);
+
+    % =========================================================
+    % save history
+    % =========================================================
+    i_Li_history(t)     = i_Li;
+    i_Na_history(t)     = i_Na;
+    i_LOC_Li_history(t) = i_LOC_Li;
+    i_LOC_Na_history(t) = i_LOC_Na;
+    i_far_history(t)    = a_v * L * (i_LOC_Li + i_LOC_Na);
+    eta_Li_history(t)   = eta_Li;
+    eta_Na_history(t)   = eta_Na;
+    R_Li_history(t)     = R_Li;
+    R_Na_history(t)     = R_Na;
+    E_Li_history(t)     = E_Li;
+    E_Na_history(t)     = E_Na;
+    C_s_Li_history(t)   = C_s_Li_solved;
+    C_s_Na_history(t)   = C_s_Na_solved;
+    C_Li_history(t)     = C_Li_solved;
+    C_Na_history(t)     = C_Na_solved;
+    phi_l_history(t)    = phi_l_solved;
+
+    theta_Li_history(:, t) = theta_Li_new;
+    theta_Na_history(:, t) = theta_Na_new;
+
+    selectivity_history(t) = (1 - C_Li_solved / C_Li_0) / ...
+                             (1 - C_Na_solved / C_Na_0);
+
+    last_valid_step = t;
+
+    % =========================================================
+    % update state
+    % =========================================================
+    C_Li_last = C_Li_solved;
+    C_Na_last = C_Na_solved;
+    phi_l_last = phi_l_solved;
+    theta_Li_profile = theta_Li_new;
+    theta_Na_profile = theta_Na_new;
+    x0 = x_sol;
+
+    % keep latest phi_l in initial guess
+    x0(15) = phi_l_last;
+end
+
+close(h);
+
+% ========================================================================
+% trim valid region
+% ========================================================================
+vr = 1:last_valid_step;
+
+i_Li_history      = i_Li_history(vr);
+i_Na_history      = i_Na_history(vr);
+i_LOC_Li_history  = i_LOC_Li_history(vr);
+i_LOC_Na_history  = i_LOC_Na_history(vr);
+i_far_history     = i_far_history(vr);
+eta_Li_history    = eta_Li_history(vr);
+eta_Na_history    = eta_Na_history(vr);
+R_Li_history      = R_Li_history(vr);
+R_Na_history      = R_Na_history(vr);
+E_Li_history      = E_Li_history(vr);
+E_Na_history      = E_Na_history(vr);
+C_s_Li_history    = C_s_Li_history(vr);
+C_s_Na_history    = C_s_Na_history(vr);
+C_Li_history      = C_Li_history(vr);
+C_Na_history      = C_Na_history(vr);
+phi_l_history     = phi_l_history(vr);
+selectivity_history = selectivity_history(vr);
+
+theta_Li_history = theta_Li_history(:, vr);
+theta_Na_history = theta_Na_history(:, vr);
+
+time = (0:last_valid_step) * dt;
+
+% add initial point
+C_Li_history_plot   = [C_Li_0, C_Li_history];
+C_Na_history_plot   = [C_Na_0, C_Na_history];
+C_s_Li_history_plot = [C_s_Li_0, C_s_Li_history];
+C_s_Na_history_plot = [C_s_Na_0, C_s_Na_history];
+
+% ========================================================================
+% FIGURES
+% ========================================================================
+figure('Position', [100, 100, 700, 600]);
+
+subplot(2,3,1);
+plot(time, C_Na_history_plot, 'b-', 'LineWidth', 1.5, 'DisplayName', 'Na^+');
+hold on;
+plot(time, C_Li_history_plot, 'r-', 'LineWidth', 1.5, 'DisplayName', 'Li^+');
+legend('show', 'Location', 'best');
+title('Bulk / Spacer Concentration');
+xlabel('Time (s)');
+ylabel('Concentration (mol m^{-3})');
+grid on;
+
+subplot(2,3,2);
+plot(time, C_s_Na_history_plot, 'b-', 'LineWidth', 1.5, 'DisplayName', 'Na^+');
+hold on;
+plot(time, C_s_Li_history_plot, 'r-', 'LineWidth', 1.5, 'DisplayName', 'Li^+');
+legend('show', 'Location', 'best');
+title('Particle Surface Concentration');
+xlabel('Time (s)');
+ylabel('Concentration (mol m^{-3})');
+grid on;
+
+subplot(2,3,3);
+plot(time(2:end), E_Na_history, 'b-', 'LineWidth', 1.5, 'DisplayName', 'E_{Na}');
+hold on;
+plot(time(2:end), E_Li_history, 'r-', 'LineWidth', 1.5, 'DisplayName', 'E_{Li}');
+legend('show', 'Location', 'best');
+title('Equilibrium Potential');
+xlabel('Time (s)');
+ylabel('Potential (V)');
+grid on;
+
+subplot(2,3,4);
+plot(time(2:end), eta_Na_history, 'b-', 'LineWidth', 1.5, 'DisplayName', '\eta_{Na}');
+hold on;
+plot(time(2:end), eta_Li_history, 'r-', 'LineWidth', 1.5, 'DisplayName', '\eta_{Li}');
+legend('show', 'Location', 'best');
+title('Overpotential');
+xlabel('Time (s)');
+ylabel('Overpotential (V)');
+grid on;
+
+subplot(2,3,5);
+plot(time(2:end), selectivity_history, 'k-', 'LineWidth', 1.5);
+title('Selectivity');
+xlabel('Time (s)');
+ylabel('S_{Li/Na}');
+grid on;
+
+subplot(2,3,6);
+plot(time(2:end), R_Li_history, 'r-', 'LineWidth', 1.5, 'DisplayName', 'R_{Li}');
+hold on;
+plot(time(2:end), R_Na_history, 'b-', 'LineWidth', 1.5, 'DisplayName', 'R_{Na}');
+legend('show', 'Location', 'best');
+title('Reaction Rate');
+xlabel('Time (s)');
+ylabel('Rate (mol m^{-3} s^{-1})');
+grid on;
+
+% particle profiles
+figure('Position', [150, 150, 800, 400]);
+
+time_steps_valid = last_valid_step;
+r_physical = xr * r_p * 1e6;
+time_indices = unique(round(linspace(1, max(time_steps_valid,1), min(5,max(time_steps_valid,1)))));
+colors = jet(length(time_indices));
+
+subplot(1,2,1);
+for i = 1:length(time_indices)
+    idx = time_indices(i);
+    plot(r_physical, theta_Li_history(:, idx), '-', ...
+        'LineWidth', 1.5, 'Color', colors(i,:), ...
+        'DisplayName', sprintf('t = %.1f s', idx*dt));
+    hold on;
+end
+legend('show', 'Location', 'best');
+title('Li^+ Occupancy in Particle');
+xlabel('Radius (\mum)');
+ylabel('\theta_{Li}');
+grid on;
+
+subplot(1,2,2);
+for i = 1:length(time_indices)
+    idx = time_indices(i);
+    plot(r_physical, theta_Na_history(:, idx), '-', ...
+        'LineWidth', 1.5, 'Color', colors(i,:), ...
+        'DisplayName', sprintf('t = %.1f s', idx*dt));
+    hold on;
+end
+legend('show', 'Location', 'best');
+title('Na^+ Occupancy in Particle');
+xlabel('Radius (\mum)');
+ylabel('\theta_{Na}');
+grid on;
+
+fprintf('Simulation completed successfully!\n');
+if ~isempty(selectivity_history)
+    fprintf('Final selectivity: %.4f\n', selectivity_history(end));
+end
+if ~isempty(C_s_Li_history)
+    fprintf('Final Li surface concentration: %.2f mol/m^3\n', C_s_Li_history(end));
+    fprintf('Final Na surface concentration: %.2f mol/m^3\n', C_s_Na_history(end));
+end

@@ -1,0 +1,410 @@
+function sol = solve_local_simple(E_Li, E_Na, C_s_Li, C_s_Na, ...
+                                  C_mA_Li, C_mA_Na, C_mA_Cl, params)
+% ========================================================================
+% solve_local_simple
+% ------------------------------------------------------------------------
+% Electrochemical subproblem solver for the flow-by model.
+%
+% Description
+%   This function solves the coupled electrochemical subproblem under
+%   galvanostatic operation. A global electrolyte potential is first
+%   obtained from an electrode-averaged current-balance equation and is
+%   then used as the initial guess for a local self-consistent iteration.
+%
+% Numerical procedure
+%   1. Solve for a global electrolyte potential using electrode-averaged
+%      quantities and Newton iteration.
+%   2. Evaluate local Butler-Volmer currents for Li+ and Na+.
+%   3. Reconstruct the liquid-phase current profile from charge
+%      conservation and enforce the total current constraint.
+%   4. Reconstruct the electrolyte and solid potential distributions from
+%      Ohm-type relations.
+%   5. Introduce a uniform shift in the electrolyte potential so that the
+%      spatially averaged interfacial current satisfies the imposed
+%      galvanostatic condition.
+%   6. Iterate until the local current distribution converges.
+%
+% Inputs
+%   E_Li, E_Na      : local equilibrium potentials for Li+ and Na+
+%   C_s_Li, C_s_Na  : local solid-phase concentrations
+%   C_mA_Li         : local macropore Li+ concentration
+%   C_mA_Na         : local macropore Na+ concentration
+%   C_mA_Cl         : local macropore Cl- concentration
+%   params          : parameter structure
+%
+% Output structure
+%   sol.phi_l_half    : electrolyte potential at cell centers
+%   sol.phi_s_half    : solid potential at cell centers
+%   sol.eta_Li        : Li+ overpotential
+%   sol.eta_Na        : Na+ overpotential
+%   sol.i_LOC_Li      : local Li+ interfacial current density
+%   sol.i_LOC_Na      : local Na+ interfacial current density
+%   sol.i_LOC_Li_mean : mean Li+ interfacial current density
+%   sol.i_LOC_Na_mean : mean Na+ interfacial current density
+% ========================================================================
+
+%% =======================================================================
+% Unpack parameters
+% =======================================================================
+N_x     = params.N_x;
+F_const = params.F_const;
+R_const = params.R;
+T_const = params.T;
+V_T     = R_const * T_const / F_const;
+
+L       = params.L;
+dx      = params.dx_electrode;
+a_v     = params.a_v;
+alpha   = params.alpha_transfer;
+K_Li    = params.K_Li;
+K_Na    = params.K_Na;
+C_max   = params.C_max;
+
+phi_s_ref = params.phi_s_ref;
+I_tot     = params.I;                  % Applied current density [A m^-2]
+sigma_s   = max(params.sigma_s, 1e-12);
+
+%% =======================================================================
+% Numerical settings
+% =======================================================================
+max_iter_newton = 50;
+tol_newton      = 1e-8;
+
+max_iter_local  = 100;
+tol_i_loc       = 1e-6;
+tol_I_bc        = 1e-6;
+tol_shift       = 1e-8;
+
+relax_i   = 0.35;
+relax_il  = 0.50;
+relax_phi = 0.50;
+
+eta_min = -0.4;
+eta_max =  0.4;
+
+%% =======================================================================
+% Preprocess local state variables
+% =======================================================================
+theta_Li_vec = min(max(C_s_Li / C_max, 1e-5), 0.99);
+theta_Na_vec = min(max(C_s_Na / C_max, 1e-5), 0.99);
+
+C_mA_Li_safe = max(C_mA_Li, 1e-8);
+C_mA_Na_safe = max(C_mA_Na, 1e-8);
+C_mA_Cl_safe = max(C_mA_Cl, 1e-8);
+
+%% =======================================================================
+% Step 1. Global Newton solve for the initial electrolyte potential
+% =======================================================================
+theta_Li_avg = mean(theta_Li_vec);
+theta_Na_avg = mean(theta_Na_vec);
+
+C_mA_Li_avg = max(mean(C_mA_Li_safe), 1e-8);
+C_mA_Na_avg = max(mean(C_mA_Na_safe), 1e-8);
+
+E_Li_avg = mean(E_Li);
+E_Na_avg = mean(E_Na);
+
+target_J = I_tot / (L * a_v);   % Target interfacial current density
+
+phi_l_global = -0.1;
+
+for iter = 1:max_iter_newton
+
+    eta_Li_avg = phi_s_ref - phi_l_global - E_Li_avg;
+    eta_Na_avg = phi_s_ref - phi_l_global - E_Na_avg;
+
+    eta_Li_avg = max(min(eta_Li_avg, eta_max), eta_min);
+    eta_Na_avg = max(min(eta_Na_avg, eta_max), eta_min);
+
+    vacancy_avg = max(1 - theta_Li_avg - params.k * theta_Na_avg, 1e-4);
+
+    i0_Li_avg = F_const * K_Li * ...
+        vacancy_avg^alpha * ...
+        theta_Li_avg^(1 - alpha) * ...
+        (C_mA_Li_avg / params.c0)^alpha;
+
+    i0_Na_avg = F_const * K_Na * ...
+        vacancy_avg^alpha * ...
+        (params.k * theta_Na_avg)^(1 - alpha) * ...
+        (C_mA_Na_avg / params.c0)^alpha;
+
+    exp_Li_a = exp(alpha * eta_Li_avg / V_T);
+    exp_Li_c = exp(-(1 - alpha) * eta_Li_avg / V_T);
+    i_Li_avg = i0_Li_avg * (exp_Li_a - exp_Li_c);
+
+    exp_Na_a = exp(alpha * eta_Na_avg / V_T);
+    exp_Na_c = exp(-(1 - alpha) * eta_Na_avg / V_T);
+    i_Na_avg = i0_Na_avg * (exp_Na_a - exp_Na_c);
+
+    residual = i_Li_avg + i_Na_avg - target_J;
+
+    if abs(residual) < tol_newton
+        break;
+    end
+
+    di_Li_deta = i0_Li_avg * ...
+        (alpha / V_T * exp_Li_a + (1 - alpha) / V_T * exp_Li_c);
+    di_Na_deta = i0_Na_avg * ...
+        (alpha / V_T * exp_Na_a + (1 - alpha) / V_T * exp_Na_c);
+
+    jacobian = -(di_Li_deta + di_Na_deta);
+    if abs(jacobian) < 1e-12
+        jacobian = sign(jacobian + eps) * 1e-12;
+    end
+
+    delta_phi = -residual / jacobian;
+    delta_phi = max(min(delta_phi, 0.02), -0.02);
+
+    phi_l_global = phi_l_global + delta_phi;
+end
+
+%% =======================================================================
+% Step 2. Initialize local fields
+% =======================================================================
+phi_s_half = phi_s_ref    * ones(N_x, 1);
+phi_l_half = phi_l_global * ones(N_x, 1);
+
+[i0_Li_vec, i0_Na_vec] = compute_i0_local(theta_Li_vec, theta_Na_vec, ...
+                                          C_mA_Li_safe, C_mA_Na_safe, params);
+
+eta_Li = phi_s_half - phi_l_half - E_Li;
+eta_Na = phi_s_half - phi_l_half - E_Na;
+
+eta_Li = max(min(eta_Li, eta_max), eta_min);
+eta_Na = max(min(eta_Na, eta_max), eta_min);
+
+i_LOC_Li = i0_Li_vec .* ...
+    (exp(alpha * eta_Li / V_T) - exp(-(1 - alpha) * eta_Li / V_T));
+
+i_LOC_Na = i0_Na_vec .* ...
+    (exp(alpha * eta_Na / V_T) - exp(-(1 - alpha) * eta_Na / V_T));
+
+%% =======================================================================
+% Step 3. Local self-consistent iteration
+% =======================================================================
+c_shift = 0.0;
+
+for iter = 1:max_iter_local
+
+    i_LOC_total_old = i_LOC_Li + i_LOC_Na;
+
+    % -------------------------------------------------------------------
+    % 3.1 Reconstruct liquid-phase current from local interfacial current
+    %     using charge conservation:
+    %         d(i_l)/dx = a_v * i_loc
+    %     with boundary condition i_l(0) = 0.
+    % -------------------------------------------------------------------
+    i_l_face_raw = zeros(N_x + 1, 1);
+    for j = 1:N_x
+        i_l_face_raw(j + 1) = i_l_face_raw(j) + a_v * i_LOC_total_old(j) * dx;
+    end
+
+    % -------------------------------------------------------------------
+    % 3.2 Enforce the global current constraint at x = L:
+    %         i_l(L) = I_tot
+    % -------------------------------------------------------------------
+    if abs(i_l_face_raw(end)) < 1e-12
+        scale_il = 1.0;
+    else
+        scale_il = I_tot / i_l_face_raw(end);
+    end
+
+    i_l_face_target = scale_il * i_l_face_raw;
+    i_l_face = (1 - relax_il) * i_l_face_raw + relax_il * i_l_face_target;
+
+    % -------------------------------------------------------------------
+    % 3.3 Reconstruct solid-phase current:
+    %         i_s + i_l = I_tot
+    % -------------------------------------------------------------------
+    i_s_face = I_tot - i_l_face;
+
+    % -------------------------------------------------------------------
+    % 3.4 Reconstruct the electrolyte potential shape from an Ohmic-type
+    %     relation:
+    %         i_l = -kappa_eff * d(phi_l)/dx
+    %     This provides phi_l up to an arbitrary constant.
+    % -------------------------------------------------------------------
+    kappa_eff = (F_const / V_T) * ...
+        (params.D_Li_eff .* C_mA_Li_safe + ...
+         params.D_Na_eff .* C_mA_Na_safe + ...
+         params.D_Cl_eff .* C_mA_Cl_safe);
+    kappa_eff = max(kappa_eff, 1e-8);
+
+    phi_l_face_shape = zeros(N_x + 1, 1);
+    phi_l_face_shape(1) = 0.0;   % Temporary reference for shape only
+
+    for j = 1:N_x
+        phi_l_face_shape(j + 1) = phi_l_face_shape(j) ...
+            - i_l_face(j) * dx / kappa_eff(j);
+    end
+
+    phi_l_half_shape = 0.5 * ...
+        (phi_l_face_shape(1:end-1) + phi_l_face_shape(2:end));
+
+    % -------------------------------------------------------------------
+    % 3.5 Reconstruct the solid-phase potential:
+    %         i_s = -sigma_s * d(phi_s)/dx
+    %     with boundary condition phi_s(0) = phi_s_ref.
+    % -------------------------------------------------------------------
+    phi_s_face_new = zeros(N_x + 1, 1);
+    phi_s_face_new(1) = phi_s_ref;
+
+    for j = 1:N_x
+        phi_s_face_new(j + 1) = phi_s_face_new(j) ...
+            - i_s_face(j) * dx / sigma_s;
+    end
+
+    phi_s_half_new = 0.5 * ...
+        (phi_s_face_new(1:end-1) + phi_s_face_new(2:end));
+
+    % -------------------------------------------------------------------
+    % 3.6 Determine the uniform shift in electrolyte potential so that
+    %     the spatially averaged BV current matches the imposed current.
+    % -------------------------------------------------------------------
+    c_shift = solve_c_shift(phi_l_half_shape, phi_s_half_new, ...
+                            E_Li, E_Na, i0_Li_vec, i0_Na_vec, ...
+                            target_J, V_T, alpha, tol_shift, c_shift);
+
+    phi_l_half_new = phi_l_half_shape + c_shift;
+
+    % -------------------------------------------------------------------
+    % 3.7 Update local overpotentials and interfacial currents
+    % -------------------------------------------------------------------
+    eta_Li_new = phi_s_half_new - phi_l_half_new - E_Li;
+    eta_Na_new = phi_s_half_new - phi_l_half_new - E_Na;
+
+    eta_Li_new = max(min(eta_Li_new, eta_max), eta_min);
+    eta_Na_new = max(min(eta_Na_new, eta_max), eta_min);
+
+    i_LOC_Li_new = i0_Li_vec .* ...
+        (exp(alpha * eta_Li_new / V_T) - exp(-(1 - alpha) * eta_Li_new / V_T));
+
+    i_LOC_Na_new = i0_Na_vec .* ...
+        (exp(alpha * eta_Na_new / V_T) - exp(-(1 - alpha) * eta_Na_new / V_T));
+
+    % -------------------------------------------------------------------
+    % 3.8 Relaxation update
+    % -------------------------------------------------------------------
+    i_LOC_Li = (1 - relax_i) * i_LOC_Li + relax_i * i_LOC_Li_new;
+    i_LOC_Na = (1 - relax_i) * i_LOC_Na + relax_i * i_LOC_Na_new;
+
+    phi_l_half = (1 - relax_phi) * phi_l_half + relax_phi * phi_l_half_new;
+    phi_s_half = (1 - relax_phi) * phi_s_half + relax_phi * phi_s_half_new;
+
+    eta_Li = phi_s_half - phi_l_half - E_Li;
+    eta_Na = phi_s_half - phi_l_half - E_Na;
+
+    % -------------------------------------------------------------------
+    % 3.9 Convergence criteria
+    % -------------------------------------------------------------------
+    err_i_loc = max(abs((i_LOC_Li + i_LOC_Na) - i_LOC_total_old));
+    err_I_bc  = abs(i_l_face(end) - I_tot);
+
+    if err_i_loc < tol_i_loc && err_I_bc < tol_I_bc
+        break;
+    end
+end
+
+if iter == max_iter_local
+    warning(['solve_local_simple: local iteration reached the maximum ', ...
+             'number of iterations without full convergence.']);
+end
+
+%% =======================================================================
+% Output
+% =======================================================================
+sol.phi_l_half    = phi_l_half;
+sol.phi_s_half    = phi_s_half;
+sol.eta_Li        = eta_Li;
+sol.eta_Na        = eta_Na;
+sol.i_LOC_Li      = i_LOC_Li;
+sol.i_LOC_Na      = i_LOC_Na;
+sol.i_LOC_Li_mean = mean(i_LOC_Li);
+sol.i_LOC_Na_mean = mean(i_LOC_Na);
+
+end
+
+% ========================================================================
+% Local helper function: exchange current densities
+% ========================================================================
+function [i0_Li_vec, i0_Na_vec] = compute_i0_local(theta_Li_vec, theta_Na_vec, ...
+                                                   C_mA_Li, C_mA_Na, params)
+
+F_const = params.F_const;
+K_Li    = params.K_Li;
+K_Na    = params.K_Na;
+alpha   = params.alpha_transfer;
+k       = params.k;
+c0      = params.c0;
+
+theta_Li_vec = min(max(theta_Li_vec, 1e-5), 0.99);
+theta_Na_vec = min(max(theta_Na_vec, 1e-5), 0.99);
+
+vacancy = max(1 - theta_Li_vec - k * theta_Na_vec, 1e-4);
+
+i0_Li_vec = F_const * K_Li .* ...
+    vacancy.^alpha .* ...
+    theta_Li_vec.^(1 - alpha) .* ...
+    (max(C_mA_Li, 1e-8) / c0).^alpha;
+
+i0_Na_vec = F_const * K_Na .* ...
+    vacancy.^alpha .* ...
+    (k * theta_Na_vec).^(1 - alpha) .* ...
+    (max(C_mA_Na, 1e-8) / c0).^alpha;
+
+end
+
+% ========================================================================
+% Local helper function: solve uniform electrolyte potential shift
+% ========================================================================
+function c_shift = solve_c_shift(phi_l_shape, phi_s, E_Li, E_Na, ...
+                                 i0_Li_vec, i0_Na_vec, ...
+                                 target_J, V_T, alpha, tol_shift, c_init)
+
+max_iter = 30;
+c_shift  = c_init;
+
+for it = 1:max_iter
+
+    eta_Li = phi_s - (phi_l_shape + c_shift) - E_Li;
+    eta_Na = phi_s - (phi_l_shape + c_shift) - E_Na;
+
+    eta_Li = max(min(eta_Li, 0.4), -0.4);
+    eta_Na = max(min(eta_Na, 0.4), -0.4);
+
+    exp_Li_a = exp(alpha * eta_Li / V_T);
+    exp_Li_c = exp(-(1 - alpha) * eta_Li / V_T);
+    i_Li     = i0_Li_vec .* (exp_Li_a - exp_Li_c);
+
+    exp_Na_a = exp(alpha * eta_Na / V_T);
+    exp_Na_c = exp(-(1 - alpha) * eta_Na / V_T);
+    i_Na     = i0_Na_vec .* (exp_Na_a - exp_Na_c);
+
+    residual = mean(i_Li + i_Na) - target_J;
+
+    if abs(residual) < tol_shift
+        return;
+    end
+
+    di_Li_deta = i0_Li_vec .* ...
+        (alpha / V_T .* exp_Li_a + (1 - alpha) / V_T .* exp_Li_c);
+    di_Na_deta = i0_Na_vec .* ...
+        (alpha / V_T .* exp_Na_a + (1 - alpha) / V_T .* exp_Na_c);
+
+    % Since eta = phi_s - (phi_l_shape + c_shift) - E,
+    % d(eta)/d(c_shift) = -1.
+    jacobian = -mean(di_Li_deta + di_Na_deta);
+
+    if abs(jacobian) < 1e-12
+        jacobian = sign(jacobian + eps) * 1e-12;
+    end
+
+    delta_c = -residual / jacobian;
+    delta_c = max(min(delta_c, 0.02), -0.02);
+
+    c_shift = c_shift + delta_c;
+end
+
+warning('solve_c_shift: Newton iteration did not fully converge.');
+
+end
