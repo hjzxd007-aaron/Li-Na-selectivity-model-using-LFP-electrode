@@ -5,7 +5,7 @@ clc; clear; close all;
 % ========================================================================
 D_Li = 1.03e-9; 
 D_Na = 1.33e-9; 
-D_Cl = 2.03e-9; %#ok<NASGU> % kept only for completeness
+D_Cl = 2.03e-9; % kept only for completeness
 
 F_const = 96485; 
 R = 8.314; 
@@ -32,9 +32,9 @@ k = 1.63;
 
 phi_s = 0;
 
-z_Li = 1; %#ok<NASGU>
-z_Na = 1; %#ok<NASGU>
-z_Cl = -1; %#ok<NASGU>
+z_Li = 1; 
+z_Na = 1; 
+z_Cl = -1; 
 
 NLR = 200;
 C_Na_0 = 500;
@@ -43,7 +43,7 @@ C_Cl_0 = C_Na_0 + C_Li_0;
 A_sp = 25e-4;
 
 
-I = -100/25*10;   % same sign convention as original code
+I = -100/25*10;  
 
 V_sp = 500e-6;
 
