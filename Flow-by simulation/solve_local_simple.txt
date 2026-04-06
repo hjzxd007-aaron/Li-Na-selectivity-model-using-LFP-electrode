@@ -17,8 +17,10 @@ function sol = solve_local_simple(E_Li, E_Na, C_s_Li, C_s_Na, ...
 %   2. Evaluate local Butler-Volmer currents for Li+ and Na+.
 %   3. Reconstruct the liquid-phase current profile from charge
 %      conservation and enforce the total current constraint.
-%   4. Reconstruct the electrolyte and solid potential distributions from
-%      Ohm-type relations.
+%   4. Reconstruct the liquid-phase current profile from charge
+%      conservation, update the electrolyte potential from the
+%      Nernst-Planck current relation, and reconstruct the solid
+%      potential from Ohm's law.
 %   5. Introduce a uniform shift in the electrolyte potential so that the
 %      spatially averaged interfacial current satisfies the imposed
 %      galvanostatic condition.
@@ -218,24 +220,79 @@ for iter = 1:max_iter_local
     % -------------------------------------------------------------------
     i_s_face = I_tot - i_l_face;
 
-    % -------------------------------------------------------------------
-    % 3.4 Reconstruct the electrolyte potential shape from an Ohmic-type
-    %     relation:
-    %         i_l = -kappa_eff * d(phi_l)/dx
+       % -------------------------------------------------------------------
+    % 3.4 Reconstruct the electrolyte potential shape from the strict
+    %     Nernst-Planck current relation:
+    %
+    %         J_i = -D_eff,i * (dC_i/dx + z_i * C_i * d(phi_l)/dx)
+    %         i_l = F * sum(z_i * J_i)
+    %
+    %     Therefore,
+    %
+    %         d(phi_l)/dx
+    %       = - [ i_l/F + sum(z_i * D_eff,i * dC_i/dx) ]
+    %           / [ sum(z_i^2 * D_eff,i * C_i) ]
+    %
     %     This provides phi_l up to an arbitrary constant.
     % -------------------------------------------------------------------
-    kappa_eff = (F_const / V_T) * ...
-        (params.D_Li_eff .* C_mA_Li_safe + ...
-         params.D_Na_eff .* C_mA_Na_safe + ...
-         params.D_Cl_eff .* C_mA_Cl_safe);
-    kappa_eff = max(kappa_eff, 1e-8);
 
+    % Effective diffusion coefficients (allow either scalar or vector form)
+    D_Li_eff = params.D_Li_eff;
+    D_Na_eff = params.D_Na_eff;
+    D_Cl_eff = params.D_Cl_eff;
+
+    if isscalar(D_Li_eff), D_Li_eff = D_Li_eff * ones(N_x,1); end
+    if isscalar(D_Na_eff), D_Na_eff = D_Na_eff * ones(N_x,1); end
+    if isscalar(D_Cl_eff), D_Cl_eff = D_Cl_eff * ones(N_x,1); end
+
+    % Concentration gradients at cell centers
+    dCdx_Li = zeros(N_x,1);
+    dCdx_Na = zeros(N_x,1);
+    dCdx_Cl = zeros(N_x,1);
+
+    % Interior points: central difference
+    for j = 2:N_x-1
+        dCdx_Li(j) = (C_mA_Li_safe(j+1) - C_mA_Li_safe(j-1)) / (2*dx);
+        dCdx_Na(j) = (C_mA_Na_safe(j+1) - C_mA_Na_safe(j-1)) / (2*dx);
+        dCdx_Cl(j) = (C_mA_Cl_safe(j+1) - C_mA_Cl_safe(j-1)) / (2*dx);
+    end
+
+    % Boundaries: one-sided difference
+    if N_x >= 2
+        dCdx_Li(1)   = (C_mA_Li_safe(2)   - C_mA_Li_safe(1))   / dx;
+        dCdx_Li(end) = (C_mA_Li_safe(end) - C_mA_Li_safe(end-1)) / dx;
+
+        dCdx_Na(1)   = (C_mA_Na_safe(2)   - C_mA_Na_safe(1))   / dx;
+        dCdx_Na(end) = (C_mA_Na_safe(end) - C_mA_Na_safe(end-1)) / dx;
+
+        dCdx_Cl(1)   = (C_mA_Cl_safe(2)   - C_mA_Cl_safe(1))   / dx;
+        dCdx_Cl(end) = (C_mA_Cl_safe(end) - C_mA_Cl_safe(end-1)) / dx;
+    end
+
+    % Interpolate face current to cell centers
+    i_l_center = 0.5 * (i_l_face(1:end-1) + i_l_face(2:end));
+
+    % Strict NP gradient for phi_l at cell centers
+    % z_Li = +1, z_Na = +1, z_Cl = -1
+    numerator = i_l_center / F_const ...
+              + D_Li_eff .* dCdx_Li ...
+              + D_Na_eff .* dCdx_Na ...
+              - D_Cl_eff .* dCdx_Cl;
+
+    denominator = D_Li_eff .* C_mA_Li_safe ...
+                + D_Na_eff .* C_mA_Na_safe ...
+                + D_Cl_eff .* C_mA_Cl_safe;
+
+    denominator = max(denominator, 1e-12);
+
+    dphi_dx_center = - numerator ./ denominator;
+
+    % Reconstruct phi_l on faces from dphi/dx, up to an arbitrary constant
     phi_l_face_shape = zeros(N_x + 1, 1);
-    phi_l_face_shape(1) = 0.0;   % Temporary reference for shape only
+    phi_l_face_shape(1) = 0.0;   % temporary reference for shape only
 
     for j = 1:N_x
-        phi_l_face_shape(j + 1) = phi_l_face_shape(j) ...
-            - i_l_face(j) * dx / kappa_eff(j);
+        phi_l_face_shape(j + 1) = phi_l_face_shape(j) + dphi_dx_center(j) * dx;
     end
 
     phi_l_half_shape = 0.5 * ...
