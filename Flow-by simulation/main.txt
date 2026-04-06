@@ -30,7 +30,7 @@ L_sp = 0.02;       % spacer length [m]
 C_max = 3000;      % maximum site concentration [mol m^-3]
 c0    = 1000;      % reference concentration [mol m^-3]
 
-dt      = 0.1;     % time step [s]
+dt      = 0.08;     % time step [s]
 t_max   = 260000;  % total simulation time [s]
 n_steps = round(t_max / dt);
 
@@ -60,7 +60,7 @@ I = -0.1 / 25 * 10;        % applied current density [A m^-2], negative = adsorp
 
 % Spacer / chamber
 A_sp = 25e-4;              % electrode area [m^2]
-V_sp = 50000000e-6;        % spacer volume [m^3]
+V_sp = 500e-6;        % spacer volume [m^3]
 
 alpha_transfer = 0.5;
 n_Li = 1; n_Na = 1;
@@ -79,8 +79,8 @@ dr_p = 5e-8;      % radial step [m]
 N_r  = round(r_p / dr_p);
 dx_r = 1 / N_r;
 
-D_in_Li = 5e-14;
-D_in_Na = 1e-13;
+D_in_Li = 1e-13; 
+D_in_Na = 5e-14;
 
 a_v   = 3 * P_IHC / r_p;   % specific surface area [m^2 m^-3]
 n_sub = 200;               % substeps for particle diffusion
