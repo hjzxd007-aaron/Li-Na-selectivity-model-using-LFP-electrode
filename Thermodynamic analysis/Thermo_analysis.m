@@ -5,7 +5,7 @@ clc; clear; close all;
 % ========================================================================
 
 F_const = 96485;              % Faraday constant (C/mol)
-C_max   = 3000;               % Maximum intercalation concentration (mol/m^3)
+C_max   = 22800;               % Maximum intercalation concentration (mol/m^3)
 c0      = 1000;               % Reference concentration (mol/m^3)
 
 R = 8.314;                    % Gas constant (J/mol/K)
