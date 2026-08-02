@@ -22,9 +22,10 @@ theta_max = 0.999;
 % Number of points retained for fitting
 n = 200;
 
-% Fixed parameter k (not fitted)
+% Fixed parameter  
 k_fixed = 1.63;
-
+c_ion=1000; % electrolyte concentration, mol/m^3
+c_0=1000; % reference concentration, mol/m^3
 %% ========================================================================
 %  DATA IMPORT
 % ========================================================================
@@ -101,7 +102,7 @@ end
 % ========================================================================
 
 fit_eqn = fittype( ...
-    'E_ref - 0.0257*(log(k*theta/(1-k*theta))) - g_i*(k*theta)', ...
+    'E_ref - 0.0257*(log(k*theta/(1-k*theta))) + 0.0257*(c_ion/c_0) - g_i*(k*theta)', ...
     'independent','theta', ...
     'coefficients',{'E_ref','g_i'}, ...
     'problem','k');
