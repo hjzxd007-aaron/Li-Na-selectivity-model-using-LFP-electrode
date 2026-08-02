@@ -21,7 +21,7 @@ g_Li     = -0.102;
 E_Na_ref = -0.11;
 g_Na     = 0.0846;
 
-k = 1.63;                     % Site competition coefficient
+k = 1.63;                     % Site competition coefficient of Na
 
 %% ========================================================================
 %  SYSTEM GEOMETRY
