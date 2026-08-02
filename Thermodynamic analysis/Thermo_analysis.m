@@ -21,7 +21,7 @@
 %
 % The final site-occupancy condition is:
 %
-%   theta_Li + k_capacity*theta_Na = target_theta
+%   theta_Li + k_capacity * theta_Na = target_theta
 %
 % where:
 %
@@ -53,7 +53,7 @@
 %
 %   target_theta
 %       Prescribed final site occupancy:
-%       theta_Li + k_capacity*theta_Na.
+%       theta_Li + k_capacity * theta_Na.
 %
 %   C_Na_feed
 %       Initial Na concentration in the electrolyte.
@@ -144,7 +144,7 @@ NLR_list = [1, 2, 10, 20, 100, 200, 1000, ...
 C_Na_feed = 500;
 
 % Final site occupancy:
-% theta_Li + k_capacity*theta_Na = target_theta
+% theta_Li + k_capacity * theta_Na = target_theta
 target_theta = 0.99;
 
 %% ========================================================================
