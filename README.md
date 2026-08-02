@@ -1,6 +1,6 @@
 # Li–Na Selectivity Model Using an LFP Electrode
 
-This repository contains MATLAB codes used to analyze competitive Li\(^+\)/Na\(^+\) intercalation in lithium iron phosphate (LFP)/iron phosphate electrodes. The codes combine a competitive Frumkin thermodynamic model, Butler–Volmer interfacial kinetics, ion transport, and solid-state diffusion to examine the thermodynamic, kinetic, and transport origins of Li/Na selectivity.
+This repository contains MATLAB codes used to analyze competitive Li/Na intercalation in lithium iron phosphate (LFP)/iron phosphate electrodes. The codes combine a competitive Frumkin thermodynamic model, Butler–Volmer interfacial kinetics, ion transport, and solid-state diffusion to examine the thermodynamic, kinetic, and transport origins of Li/Na selectivity.
 
 The repository includes four components:
 
