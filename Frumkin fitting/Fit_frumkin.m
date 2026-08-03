@@ -56,7 +56,7 @@
 % The script generates a fitted potential-composition curve and exports
 % the processed data, fitted parameters, and model information to:
 %
-%   Frumkin_Langmuir_Results.xlsx
+%   Frumkin_Fitting_Results.xlsx
 %
 % Required MATLAB toolbox:
 %   Curve Fitting Toolbox
@@ -397,7 +397,7 @@ box on;
 %  EXPORT RESULTS
 % ========================================================================
 
-output_filename = 'Frumkin_Langmuir_Results.xlsx';
+output_filename = 'Frumkin_Fitting_Results.xlsx';
 
 % Delete an existing output file to avoid retaining old worksheets
 if isfile(output_filename)
