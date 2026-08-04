@@ -8,7 +8,7 @@ The **Thermodynamic analysis** module applies a competitive Frumkin model to mix
 
 The **Flow-through simulation** implements a zero-dimensional flow-through model in which the electrolyte composition within the electrode macropores is assumed to be spatially uniform. The model couples competitive Frumkin thermodynamics, Butler-Volmer interfacial kinetics, and radial solid-state diffusion within spherical particles. This model is used to evaluate interfacial kinetic and solid-state diffusion effects without explicitly resolving macropore concentration gradients.
 
-The **Flow-by simulation** implements a one-dimensional model along the electrode thickness direction. It explicitly resolves ion transport and electrolyte-potential distributions within the electrode macropores while coupling competitive Frumkin thermodynamics, Butler-Volmer interfacial kinetics, electronic conduction, and radial solid-state diffusion. This model is used to evaluate the combined thermodynamic, kinetic, solid-state diffusion, and electrode-scale transport origins of Li/Na selectivity.
+The **Flow-by simulation** implements a one-dimensional model along the electrode thickness direction. It explicitly resolves ion transport within the electrode macropores while coupling competitive Frumkin thermodynamics, Butler-Volmer interfacial kinetics, and radial solid-state diffusion. This model is used to evaluate the combined thermodynamic, kinetic, solid-state diffusion, and electrode-scale transport origins of Li/Na selectivity.
 
 ## Repository structure
 
@@ -29,10 +29,6 @@ The **Flow-by simulation** implements a one-dimensional model along the electrod
     ├── compute_flux.m
     └── solve_theta_diffusion_all.m
 ```
-
-> **Important:** The source files in the provided archive are stored with the `.txt` extension. Rename all MATLAB source files from `.txt` to `.m` before running the codes.
-
-> MATLAB function names must begin with a letter, and the filename of a primary function must match the function name. The file currently named `0D_electrochemical_equations.txt` contains the function `OD_electrochemical_equations_reduced`, where `OD` begins with the letter O rather than the numeral zero. The file should therefore be renamed as `OD_electrochemical_equations_reduced.m`.
 
 ## Requirements
 
