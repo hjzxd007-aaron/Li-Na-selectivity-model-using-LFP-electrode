@@ -158,8 +158,8 @@ n_Na = 1;              % Electrons transferred per Na reaction [-]
 v_Li = 1;              % Li stoichiometric coefficient [-]
 v_Na = 1;              % Na stoichiometric coefficient [-]
 
-K_Li = 1e-13;          % Li kinetic parameter [m s^-1]
-K_Na = 0.1*K_Li;       % Na kinetic parameter [m s^-1]
+K_Li = 1e-13;          % Li kinetic parameter [mol m^-2 s^-1]
+K_Na = 0.1*K_Li;       % Na kinetic parameter [mol m^-2 s^-1]
 
 % Particle parameters
 r_p = 500e-9;          % Particle radius [m]
