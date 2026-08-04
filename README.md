@@ -19,8 +19,8 @@ The **Flow-by simulation** implements a one-dimensional model along the electrod
 ├── Thermodynamic analysis/
 │   └── Thermo_analysis.m
 ├── Flow-through simulation/
-│   ├── 0D_main.m
-│   ├── OD_electrochemical_equations.m
+│   ├── zeroD_main.m
+│   ├── zeroD_electrochemical_equations.m
 │   └── solve_theta_diffusion_all.m
 └── Flow-by simulation/
     ├── main.m
