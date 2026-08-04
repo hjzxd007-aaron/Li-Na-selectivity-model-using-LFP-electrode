@@ -55,277 +55,117 @@ Each module should remain in its own folder so that MATLAB can locate the associ
 
 ## 1. Frumkin fitting
 
-### Purpose
-
-`Fit_frumkin.m` fits single-salt electrochemical potential-composition data using a modified Frumkin expression. This module is applied separately to Li-containing and Na-containing single-salt electrolytes to determine the thermodynamic parameters for each ion.
+`Fit_frumkin.m` fits single-salt potential-composition data using a modified Frumkin thermodynamic model to determine `E_ref` and `g_i` for Li or Na intercalation.
 
 The fitted expression is:
 
-E = E_ref - V_T * ln[k*theta)/(1-k*theta)] - g_i*k*theta
-```
+    E = E_ref
+        - V_T ln[(k_capacity theta)/(1 - k_capacity theta)]
+        + V_T ln(c_ion/c_0)
+        - g_i (k_capacity theta)
 
-where:
+Use:
 
-- `E_ref` is the reference intercalation potential.
-- `V_T = RT/F` is the thermal voltage.
-- `g_i` is the self-interaction parameter for the intercalating ion.
-- `k` is the site-occupation coefficient.
-- `theta` is the normalized degree of intercalation.
+- `k_capacity = 1.00` for Li fitting
+- `k_capacity = 1.63` for Na fitting
 
-The fitted single-ion thermodynamic parameters are subsequently used in the competitive Li/Na models.
+The input file must contain a potential column and either a `theta` column or a capacity column. When capacity data are provided, the script calculates:
 
-### Required input
+    theta = capacity/C_max
 
-The script currently expects an input file named:
+The input filename is specified by `fname`. The script plots the fitted curve and exports the results to:
 
-Capacity_LFP_NaCl.txt
-
-The data file should be placed in the same folder as `Fit_frumkin.m`. Alternatively, the variable `fname` near the beginning of the script can be changed to specify another filename.
-
-The input table must contain:
-
-- a potential column, such as `E/V`, `Ewe`, `E`, `Voltage`, or `Ewe(V)`; and
-- either an occupancy column, such as `theta`, or a capacity column, such as `capacity`, `Capacity`, `Q`, or `Capacity_mAh_g`.
-
-When capacity data are supplied, the script normalizes the capacity by `C_max_manual` to calculate `theta`. The default value of `C_max_manual` is 135 mAh/g.
-
-### Main user-defined parameters
-
-- `fname`: input-data filename
-- `C_max_manual`: capacity used to normalize the experimental data
-- `theta_min`, `theta_max`: lower and upper limits of the occupancy range included in the fitting
-- `n`: number of retained data points
-- `k_fixed`: fixed site-occupation coefficient
-
-### Output
-
-The script plots the experimental and fitted potential-composition curves and writes the fitting results to:
-
-```text
-Frumkin_Langmuir_Results.xlsx
-```
-
-The workbook contains:
-
-- processed fitting data;
-- fitted thermodynamic parameters;
-- goodness-of-fit statistics; and
-- a description of the fitted model.
+    Frumkin_Fitting_Results.xlsx
 
 ---
 
 ## 2. Thermodynamic analysis
 
-### Purpose
+`Thermo_analysis.m` calculates equilibrium Li/Na selectivity in mixed-salt electrolytes using a competitive Frumkin thermodynamic model.
 
-`Thermo_analysis.m` applies a competitive Frumkin thermodynamic model to mixed Li/Na electrolytes.
+For each initial Na/Li concentration ratio and cross-interaction parameter, the script solves the Li and Na mass balances together with equality of their equilibrium potentials at the prescribed final site occupancy:
 
-Unlike the single-salt fitting module, this model accounts for simultaneous Li and Na occupation of the intercalation sites. Competitive uptake is calculated by combining:
+    theta_Li + k_capacity theta_Na = target_theta
 
-- Li and Na mass balances;
-- the prescribed final electrode occupation;
-- equality of the Li and Na equilibrium potentials; and
-- self- and cross-interaction terms in the competitive Frumkin model.
+where:
 
-The model is used to quantify the intrinsic equilibrium selectivity arising from the thermodynamic preference of the electrode for Li over Na.
+    theta_Li = C_s_Li/C_max
+    theta_Na = C_s_Na/C_max
 
-### Parameter sweep
+The parameter sweep is defined by `NLR_list` and `g_cross_list`. The equilibrium problem is solved using `lsqnonlin`.
 
-The script performs a parameter sweep over:
+The script plots Li/Na selectivity as a function of the initial Na/Li concentration ratio and exports the results to:
 
-- the initial Na/Li concentration ratio, defined by `ratio_list`; and
-- the Li-Na cross-interaction parameter, defined by `g_cross_list`.
-
-For each condition, the nonlinear equilibrium equations are solved using `fsolve`.
-
-### Main user-defined parameters
-
-- `E_Li_ref`, `E_Na_ref`: reference intercalation potentials for Li and Na
-- `g_Li`, `g_Na`: Li-Li and Na-Na self-interaction parameters
-- `g_cross_list`: Li-Na cross-interaction parameters included in the parameter sweep
-- `k`: site-occupation coefficient for Na
-- `ratio_list`: initial Na/Li concentration ratios
-- `target_theta`: prescribed final total electrode occupation
-- `C_sp_Na_feed`: initial Na concentration in the feed solution
-- `V_elec`, `V_sp_feed`: electrode and solution volumes used in the mass balances
-
-### Output
-
-The script plots Li/Na selectivity as a function of the initial Na/Li concentration ratio and writes the calculated results to:
-
-```text
-selectivity_g_cross_ratio_analysis.xlsx
-```
-
-The workbook contains:
-
-- calculated Li/Na selectivity;
-- final Li occupation;
-- final Na occupation; and
-- results for each combination of Na/Li ratio and cross-interaction parameter.
+    selectivity_g_cross_NLR_analysis.xlsx
 
 ---
 
 ## 3. Flow-through simulation
 
-### Purpose
-
-The flow-through module implements a zero-dimensional electrochemical model for a flow-through electrode.
-
-The electrolyte composition within the electrode macropores is assumed to be spatially uniform. Therefore, concentration and potential gradients are not resolved along the electrode thickness direction. This approximation represents rapid convective replenishment in the flow-through configuration and removes explicit electrode-scale macropore transport limitations from the model.
+The flow-through module implements a zero-dimensional electrochemical model for a flow-through electrode. The electrolyte composition in the electrode macropores is assumed to be spatially uniform, so electrode-scale concentration and potential gradients are not explicitly resolved.
 
 The model couples:
 
-- competitive Frumkin thermodynamics for Li/Na co-intercalation;
-- Butler-Volmer interfacial kinetics for Li and Na;
-- galvanostatic current partitioning between Li and Na reactions;
-- spatially uniform electrolyte mass balances; and
-- radial solid-state diffusion inside spherical active-material particles.
+- competitive Frumkin thermodynamics;
+- Butler-Volmer interfacial kinetics;
+- Li/Na current partitioning; and
+- radial solid-state diffusion in spherical particles.
 
-The flow-through model is used to isolate the effects of interfacial reaction kinetics and solid-state diffusion on Li/Na selectivity while assuming negligible concentration gradients within the electrode macropores.
+Main files:
 
-### Files
+- `0D_main.m`: defines operating conditions, runs the simulation, and plots the results
+- `OD_electrochemical_equations.m`: solves the electrochemical equations at each time step
+- `solve_theta_diffusion_all.m`: solves radial Li and Na diffusion in the particles
 
-- `0D_main.m`: defines the operating conditions and model parameters, initializes the system, advances the solution in time, stores the calculated variables, and plots the results.
-- `OD_electrochemical_equations_reduced.m`: defines the nonlinear algebraic electrochemical equations solved at each time step, including current partitioning, Butler-Volmer kinetics, equilibrium potentials, and overpotentials.
-- `solve_theta_diffusion_all.m`: solves radial Li and Na diffusion within spherical particles and updates the particle concentration profiles.
+The simulation stops when the weighted electrode occupation reaches the prescribed capacity limit:
 
-### Main user-defined parameters
+    C_s,Li + k C_s,Na >= 0.95 C_max
 
-- `NLR`: initial Na/Li concentration ratio
-- `C_Na_0`: initial Na concentration
-- `I`: applied current density; negative values represent adsorption or intercalation under the sign convention used in the code
-- `dt`, `t_max`: time-step size and total simulation time
-- `C_max`: maximum intercalation-site concentration
-- `E_Li_ref`, `E_Na_ref`: reference intercalation potentials
-- `g_Li`, `g_Na`, `g_cross`, `k`: competitive Frumkin thermodynamic parameters
-- `K_c_Li`, `K_a_Li`, `K_c_Na`, `K_a_Na`: cathodic and anodic kinetic prefactors for Li and Na
-- `r_p`: active-material particle radius
-- `D_in_Li`, `D_in_Na`: Li and Na solid-state diffusion coefficients
-- `V_sp`, `A_sp`, `L`, `P_IHC`: solution volume and electrode geometry parameters
-
-### Termination criterion
-
-The simulation terminates when the weighted electrode occupation approaches the prescribed capacity limit:
-
-```text
-C_s,Li + k*C_s,Na > 0.95*C_max
-```
-
-### Output
-
-The script generates figures showing quantities including:
-
-- spatially uniform electrolyte Li and Na concentrations;
-- particle-surface Li and Na concentrations;
-- Li and Na equilibrium potentials;
-- Li and Na overpotentials;
-- Li/Na selectivity;
-- Li and Na reaction rates; and
-- radial Li and Na occupation profiles within the particles.
-
-The current flow-through script displays the calculated results but does not automatically export all simulation variables. Permanent outputs can be added using MATLAB functions such as `save`, `writetable`, or `exportgraphics`.
+The module reports electrolyte concentrations, particle occupations, equilibrium potentials, overpotentials, reaction rates, and Li/Na selectivity.
 
 ---
 
 ## 4. Flow-by simulation
 
-### Purpose
-
-The flow-by module implements a one-dimensional, spatially resolved model along the electrode thickness direction.
-
-In contrast to the zero-dimensional flow-through model, the flow-by model explicitly resolves electrolyte transport within the electrode macropores. It therefore captures the development of concentration and potential gradients from the electrode-spacer interface into the electrode interior.
+The flow-by module implements a one-dimensional electrochemical model along the electrode thickness direction. Unlike the flow-through model, it explicitly resolves ion transport and potential distributions within the electrode macropores.
 
 The model couples:
 
-- one-dimensional Nernst-Planck transport of Li, Na, and Cl within the electrode macropores;
-- electrolyte-phase potential distribution;
-- electronic conduction and solid-phase potential distribution;
-- local competitive Frumkin thermodynamics;
-- local Butler-Volmer interfacial kinetics;
-- local current partitioning between Li and Na reactions;
-- exchange with a finite, well-mixed spacer reservoir; and
-- radial solid-state diffusion within spherical active-material particles at each axial location.
+- one-dimensional Nernst-Planck transport of Li, Na, and Cl;
+- electrolyte and solid-phase potential distributions;
+- competitive Frumkin thermodynamics;
+- Butler-Volmer interfacial kinetics; and
+- radial solid-state diffusion at each axial location.
 
-This model is used to evaluate the combined influence of thermodynamics, interfacial kinetics, solid-state diffusion, and electrode-scale macropore transport on Li/Na selectivity.
+Main files:
 
-### Boundary conditions
+- `main.m`: defines parameters, runs the simulation, plots results, and exports data
+- `solve_step_linear_explicit.m`: advances the coupled transport-reaction model
+- `solve_local_simple.m`: solves the local electrochemical problem
+- `compute_flux.m`: calculates macropore ion fluxes
+- `solve_theta_diffusion_all.m`: solves radial particle diffusion
 
-The electrode is resolved from the interior current-collector side to the electrode-spacer interface.
+The script exports the simulation results to:
 
-The model applies:
+    simulation_NLR<value>_I<value>.xlsx
 
-- a zero ionic-flux condition at the closed electrode boundary; and
-- ion exchange between the electrode macropores and the well-mixed spacer reservoir at the electrode-spacer boundary.
-
-### Files
-
-- `main.m`: defines model parameters, initializes the concentration and occupation fields, performs time integration, stores simulation results, generates figures, and exports results to Excel.
-- `solve_step_linear_explicit.m`: advances the coupled macropore transport and reaction model by one time step.
-- `solve_local_simple.m`: solves the local electrochemical problem and reconstructs the solid-phase and electrolyte-phase potential and current distributions.
-- `compute_flux.m`: calculates Li, Na, and Cl fluxes within the electrode macropores.
-- `solve_theta_diffusion_all.m`: updates radial Li and Na occupation profiles at every axial position in the electrode.
-
-### Main user-defined parameters
-
-- `NLR`, `C_Na_0`: initial electrolyte composition
-- `I`: applied current density; negative values represent adsorption or intercalation under the sign convention used in the code
-- `dt`, `t_max`, `n_save`: time integration and output intervals
-- `N_x`, `L`: number of axial grid points and electrode thickness
-- `P_mA`, `P_IHC`: macropore and active-material volume fractions
-- `D_Li`, `D_Na`, `D_Cl`: aqueous diffusion coefficients of Li, Na, and Cl
-- `sigma_s`: effective solid-phase electronic conductivity
-- `C_max`: maximum intercalation-site concentration
-- `E_Li_ref`, `E_Na_ref`: reference intercalation potentials
-- `g_Li`, `g_Na`, `g_cross`, `k`: competitive Frumkin thermodynamic parameters
-- `K_c_Li`, `K_a_Li`, `K_c_Na`, `K_a_Na`: Li and Na kinetic prefactors
-- `r_p`, `D_in_Li`, `D_in_Na`, `n_sub`: particle radius, solid-state diffusion coefficients, and particle-diffusion substep parameters
-- `A_sp`, `V_sp`, `L_sp`: spacer or external reservoir geometry
-
-### Output
-
-The script writes an Excel workbook whose filename is determined by the simulated Na/Li ratio and current density:
-
-```text
-simulation_NLR<value>_I<value>.xlsx
-```
-
-The workbook contains quantities including:
-
-- spacer-reservoir Li and Na concentrations;
-- axial macropore concentration profiles;
-- particle-surface Li and Na occupations;
-- particle-averaged Li and Na occupations;
-- local Li and Na current densities;
-- local Li and Na reaction rates;
-- overpotential profiles;
-- solid-phase potential profiles;
-- electrolyte-phase potential profiles;
-- Li and Na equilibrium-potential profiles;
-- global electrode-average quantities;
-- solution-depletion-based selectivity;
-- electrode-uptake-based selectivity; and
-- final radial occupation profiles at selected axial positions.
+The output includes electrolyte concentration profiles, particle occupations, reaction rates, potential distributions, and Li/Na selectivity.
 
 ---
 
 ## Selectivity definitions
 
-For selectivity calculated from electrolyte depletion, the implemented expression is:
+The electrolyte-depletion-based selectivity is calculated as:
 
-```text
-S_Li/Na = (1 - C_Li/C_Li,0) / (1 - C_Na/C_Na,0)
-```
+    S_Li/Na = (1 - C_Li/C_Li,0) / (1 - C_Na/C_Na,0)
 
-This definition compares the fractional removal of Li with the fractional removal of Na.
+The flow-by model also calculates an electrode-uptake-based selectivity from the changes in average Li and Na occupation.
 
-The flow-by model also calculates an electrode-based selectivity using changes in the average Li and Na occupations of the active material.
-
-At very early simulation times, Na uptake may be close to zero. The denominator of the selectivity expression can therefore become very small, producing numerically large or noisy selectivity values. Selectivity should consequently be interpreted together with the absolute Li and Na uptake and the simulation time.
+Very early-time selectivity values may be unstable when Na uptake is close to zero.
 
 ## Units and sign convention
 
-Unless otherwise specified, the codes use SI units:
+Unless otherwise specified, SI units are used:
 
 - concentration: mol/m^3
 - length: m
@@ -334,35 +174,7 @@ Unless otherwise specified, the codes use SI units:
 - current density: A/m^2
 - potential: V
 
-The applied current variable `I` follows the sign convention used in the source codes. Negative current corresponds to ion adsorption or intercalation.
-
-## Reproducing parameter sweeps
-
-The current flow-through and flow-by main scripts simulate one operating condition at a time.
-
-To reproduce a parameter sweep over quantities such as:
-
-- initial Na/Li concentration ratio;
-- applied current density;
-- electrode thickness;
-- macropore volume fraction;
-- particle radius; or
-- solid-state diffusion coefficient,
-
-place the relevant main script inside an outer loop, update the desired parameter before each simulation, and save each result using a unique filename.
-
-Because the one-dimensional flow-by model may require a large number of time steps, a new parameter set should first be tested using:
-
-- a shorter `t_max`;
-- a larger output interval `n_save`; or
-- a coarser spatial grid.
-
-The numerical solution should be checked for convergence with respect to:
-
-- time-step size `dt`;
-- axial grid size `N_x`;
-- radial particle grid size `N_r`; and
-- particle-diffusion substep number `n_sub`.
+Negative applied current corresponds to ion adsorption or intercalation.
 
 ## Notes and model limitations
 
