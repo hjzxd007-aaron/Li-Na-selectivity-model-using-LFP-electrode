@@ -113,15 +113,19 @@ The model couples:
 
 Main files:
 
-- `0D_main.m`: defines operating conditions, runs the simulation, and plots the results
-- `OD_electrochemical_equations.m`: solves the electrochemical equations at each time step
+- `zeroD_main.m`: defines operating conditions, runs the simulation, and plots the results
+- `zeroD_electrochemical_equations.m`: solves the electrochemical equations at each time step
 - `solve_theta_diffusion_all.m`: solves radial Li and Na diffusion in the particles
 
 The simulation stops when the weighted electrode occupation reaches the prescribed capacity limit:
 
     C_s,Li + k C_s,Na >= 0.95 C_max
 
-The module reports electrolyte concentrations, particle occupations, equilibrium potentials, overpotentials, reaction rates, and Li/Na selectivity.
+The script generates figures and exports the results to an Excel file named:
+
+    Results_Li<value>_Na<value>_<timestamp>.xlsx
+
+The workbook contains time-series results, concentration histories, Li and Na particle profiles, and model parameters.
 
 ---
 
