@@ -85,7 +85,7 @@ The input filename is specified by `fname`. The script plots the fitted curve an
 
 For each initial Na/Li concentration ratio and cross-interaction parameter, the script solves the Li and Na mass balances together with equality of their equilibrium potentials at the prescribed final site occupancy:
 
-    theta_Li + k_capacity theta_Na = target_theta
+    theta_Li + k_capacity * theta_Na = target_theta
 
 where:
 
@@ -113,7 +113,7 @@ The model couples:
 
 Main files:
 
-- `zeroD_main.m`: defines operating conditions, runs the simulation, and plots the results
+- `zeroD_main.m`: defines operating conditions, runs the simulation, plots the results, and exports the calculated data
 - `zeroD_electrochemical_equations.m`: solves the electrochemical equations at each time step
 - `solve_theta_diffusion_all.m`: solves radial Li and Na diffusion in the particles
 
@@ -143,7 +143,7 @@ The model couples:
 
 Main files:
 
-- `main.m`: defines parameters, runs the simulation, plots results, and exports data
+- `main.m`: defines parameters, runs the simulation, and exports data
 - `solve_step_linear_explicit.m`: advances the coupled transport-reaction model
 - `solve_local_simple.m`: solves the local electrochemical problem
 - `compute_flux.m`: calculates macropore ion fluxes
