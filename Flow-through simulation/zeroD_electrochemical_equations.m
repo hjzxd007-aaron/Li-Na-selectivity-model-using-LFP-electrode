@@ -108,8 +108,8 @@ F(4) = i_LOC_Na - i_Na * ...
 F(5) = a_v * L * (i_LOC_Li + i_LOC_Na) - I;
 
 % ===================== (6-7) overpotential =====================
-F(6) = eta_Li - (V_T*(phi_s - phi_l) - E_Li);
-F(7) = eta_Na - (V_T*(phi_s - phi_l) - E_Na);
+F(6) = eta_Li - ((phi_s - phi_l) - E_Li);
+F(7) = eta_Na - ((phi_s - phi_l) - E_Na);
 
 % ===================== (8-9) reaction rate =====================
 F(8) = R_Li - v_Li*a_v/(n_Li*F_const)*i_LOC_Li;
