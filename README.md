@@ -33,8 +33,8 @@ The **Flow-by simulation** implements a one-dimensional model along the electrod
 ## Requirements
 
 - MATLAB
-- Optimization Toolbox, used by `lsqnonlin` in the Thermodynamic analysis module
 - Curve Fitting Toolbox, used by `fit` in the Frumkin fitting module
+- Optimization Toolbox, used by `lsqnonlin` in the Thermodynamic analysis module
 - Symbolic Math Toolbox, used by `syms` and `vpasolve` during initialization of the flow-through model
 
 The Flow-by simulation uses standard MATLAB functions and does not require an additional toolbox beyond MATLAB.
@@ -44,11 +44,10 @@ Some scripts export simulation results to Excel-compatible `.xlsx` files.
 ## Quick start
 
 1. Clone or download this repository.
-2. Rename all MATLAB source files from `.txt` to `.m`.
-3. Open MATLAB.
-4. Set the MATLAB current folder to the module that you want to run.
-5. Modify the parameter definitions near the beginning of the corresponding main script, if needed.
-6. Run the main script.
+2. Open MATLAB.
+3. Set the MATLAB current folder to the module that you want to run.
+4. Modify the parameter definitions near the beginning of the corresponding main script, if needed.
+5. Run the main script.
 
 Each module should remain in its own folder so that MATLAB can locate the associated helper functions.
 
@@ -62,8 +61,7 @@ Each module should remain in its own folder so that MATLAB can locate the associ
 
 The fitted expression is:
 
-```text
-E = E_ref - V_T * ln[(k*theta)/(1-k*theta)] - g_i*k*theta
+E = E_ref - V_T * ln[k*theta)/(1-k*theta)] - g_i*k*theta
 ```
 
 where:
@@ -80,9 +78,7 @@ The fitted single-ion thermodynamic parameters are subsequently used in the comp
 
 The script currently expects an input file named:
 
-```text
 Capacity_LFP_NaCl.txt
-```
 
 The data file should be placed in the same folder as `Fit_frumkin.m`. Alternatively, the variable `fname` near the beginning of the script can be changed to specify another filename.
 
