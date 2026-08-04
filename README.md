@@ -60,9 +60,9 @@ Each module should remain in its own folder so that MATLAB can locate the associ
 The fitted expression is:
 
     E = E_ref
-        - V_T ln[(k_capacity theta)/(1 - k_capacity theta)]
+        - V_T ln[(k_capacity * theta)/(1 - k_capacity * theta)]
         + V_T ln(c_ion/c_0)
-        - g_i (k_capacity theta)
+        - g_i (k_capacity * theta)
 
 Use:
 
