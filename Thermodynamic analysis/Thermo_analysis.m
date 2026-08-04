@@ -105,7 +105,7 @@ g_Na = 0.0846;                % Na self-interaction parameter (V)
 
 % Capacity-normalization factor for Na
 % k_capacity = C_max,Li / C_max,Na
-k_capacity = 1.63;
+k_capacity = 1.63;              % Na capacity-normalization factor (-)
 
 %% ========================================================================
 %  SYSTEM GEOMETRY
@@ -121,8 +121,8 @@ V_feed = 100;                 % Electrolyte reservoir volume (m^3)
 %  INITIAL ELECTRODE STATE
 % ========================================================================
 
-theta_Li_0 = 1e-4;
-theta_Na_0 = 1e-4;
+theta_Li_0 = 1e-4;             % Initial Li occupation fraction (-)
+theta_Na_0 = 1e-4;             % Initial Na occupation fraction (-)
 
 C_s_Li_0 = theta_Li_0 * C_max;
 C_s_Na_0 = theta_Na_0 * C_max;
@@ -134,9 +134,9 @@ initial_site_occupancy = ...
 %  USER-DEFINED PARAMETER SWEEP
 % ========================================================================
 
-g_cross_list = [0, -0.1, -0.2, -0.3, -0.4, -0.5];
+g_cross_list = [0, -0.1, -0.2, -0.3, -0.4, -0.5];  % Li-Na cross-interaction parameter (V)
 
-% Initial Na/Li concentration ratio
+% Initial Na/Li concentration ratio (-)
 NLR_list = [1, 2, 10, 20, 100, 200, 1000, ...
             2000, 5000, 10000, 20000];
 
@@ -145,7 +145,7 @@ C_Na_feed = 500;
 
 % Final site occupancy:
 % theta_Li + k_capacity * theta_Na = target_theta
-target_theta = 0.99;
+target_theta = 0.99;           % Final weighted site occupancy (-)
 
 %% ========================================================================
 %  INPUT VALIDATION
@@ -487,7 +487,7 @@ if isfile(output_filename)
 end
 
 column_names = [ ...
-    {'g_cross'}, ...
+    {'g_cross_V'}, ...
     arrayfun( ...
         @(value) sprintf('NLR_%g', value), ...
         NLR_list, ...
@@ -589,10 +589,10 @@ model_information = {
     ['S_Li/Na = [(Delta C_s_Li)/C_Li_feed] / ' ...
      '[(Delta C_s_Na)/C_Na_feed]'];
 
-    'k_capacity', ...
+    'k_capacity (-)', ...
     num2str(k_capacity);
 
-    'target_theta', ...
+    'target_theta (-)', ...
     num2str(target_theta);
 
     'C_max (mol/m^3)', ...
@@ -605,7 +605,25 @@ model_information = {
     num2str(V_feed);
 
     'V_elec (m^3)', ...
-    num2str(V_elec)
+    num2str(V_elec);
+
+    'C_Li_Final unit', ...
+    'mol/m^3';
+
+    'C_Na_Final unit', ...
+    'mol/m^3';
+
+    'Theta_Li unit', ...
+    'dimensionless';
+
+    'Theta_Na unit', ...
+    'dimensionless';
+
+    'Selectivity unit', ...
+    'dimensionless';
+
+    'Maximum_Residual unit', ...
+    'dimensionless'
 };
 
 model_information_table = cell2table(model_information);
@@ -643,8 +661,8 @@ end
 
 set(gca, 'XScale', 'log');
 
-xlabel('Initial Na/Li concentration ratio');
-ylabel('Li/Na selectivity');
+xlabel('Initial Na/Li concentration ratio, NLR (-)');
+ylabel('Li/Na selectivity, S_{Li/Na} (-)');
 
 title('Thermodynamic Li/Na Selectivity');
 
