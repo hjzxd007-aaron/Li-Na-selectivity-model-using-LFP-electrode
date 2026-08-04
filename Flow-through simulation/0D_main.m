@@ -15,9 +15,9 @@ V_T = R*T/F_const;
 P_mA = 0.7; 
 P_sp = 1; 
 P_IHC = 0.1;
-L = 400e-6; 
+L = 100e-6; 
 L_sp = 0.02; 
-C_max = 3000; 
+C_max = 22800;%3000; 
 c0 = 1000;
 dt = 2; 
 t_max = 100*3600;
@@ -36,14 +36,14 @@ z_Li = 1; %#ok<NASGU>
 z_Na = 1; %#ok<NASGU>
 z_Cl = -1; %#ok<NASGU>
 
-NLR = 200;
+NLR = 100;
 C_Na_0 = 500;
 C_Li_0 = C_Na_0 / NLR;
 C_Cl_0 = C_Na_0 + C_Li_0; 
 A_sp = 25e-4;
 
 
-I = -100/25*10;   % same sign convention as original code
+I = -1/25*10;   % same sign convention as original code
 
 V_sp = 500e-6;
 
@@ -53,26 +53,28 @@ n_Na = 1;
 v_Li = 1; 
 v_Na = 1;
 
-K_c_Li = 2e-11; 
-K_a_Li = 2e-11;
-K_Li = K_c_Li^alpha_transfer * K_a_Li^(1-alpha_transfer) * C_max;
+K_c_Li = 1e-10; 
+K_a_Li = 1e-10;
+%K_Li = K_c_Li^alpha_transfer * K_a_Li^(1-alpha_transfer) * C_max;
 
-K_c_Na = 1e-11; 
-K_a_Na = 1e-11;
-K_Na = K_c_Na^alpha_transfer * K_a_Na^(1-alpha_transfer) * C_max;
+K_c_Na = 1e-10; 
+K_a_Na = 1e-10;
+%K_Na = K_c_Na^alpha_transfer * K_a_Na^(1-alpha_transfer) * C_max;
 
+K_Li = 1e-13;
+K_Na = 0.01*K_Li;
 % ========================================================================
 % PARTICLE
 % ========================================================================
-r_p = 1e-6; 
-dr_p = 5e-8;
+r_p = 500e-9; %500nm
+dr_p = 25e-9; %25nm
 N = round(r_p/dr_p); 
 dx = 1/N;
 
-D_in_Li = 5e-14; 
-D_in_Na = 1e-13;
+D_in_Li = 1.03e-13; 
+D_in_Na = 2.28e-14;
 a_v = 3 * P_IHC / r_p;
-n_sub = 200;
+n_sub = 1000;
 
 xr = dx*(0:N)';
 
@@ -176,7 +178,7 @@ for t = 1:time_steps
     theta_Li_surface_last = theta_Li_profile(end);
     theta_Na_surface_last = theta_Na_profile(end);
 
-    eqn_handle = @(x) OD_electrochemical_equations_reduced(x, ...
+    eqn_handle = @(x) zeroD_electrochemical_equations(x, ...
         k, F_const, K_Li, C_max, alpha_transfer, c0, K_Na, V_T, ...
         v_Li, v_Na, a_v, n_Li, n_Na, E_Li_ref, g_Li, g_cross, E_Na_ref, g_Na, ...
         I, C_Li_last, C_Na_last, dt, A_sp, V_sp, P_sp, L, ...
@@ -429,4 +431,174 @@ end
 if ~isempty(C_s_Li_history)
     fprintf('Final Li surface concentration: %.2f mol/m^3\n', C_s_Li_history(end));
     fprintf('Final Na surface concentration: %.2f mol/m^3\n', C_s_Na_history(end));
+end
+
+% ========================================================================
+% EXPORT TO EXCEL
+% ========================================================================
+fprintf('\nExporting results to Excel...\n');
+
+if last_valid_step > 0
+
+    % File name based on initial Li/Na concentrations and current time
+    filename = sprintf('Results_Li%g_Na%g_%s.xlsx', ...
+        C_Li_0, C_Na_0, datestr(now, 'yyyymmdd_HHMMSS'));
+
+    % --------------------------------------------------------------------
+    % Sheet 1: Time-series results
+    % --------------------------------------------------------------------
+    % time(2:end) corresponds to the calculated history variables because
+    % time(1) is the initial condition at t = 0.
+    T1 = table( ...
+        time(2:end)', ...
+        i_Li_history', ...
+        i_Na_history', ...
+        i_LOC_Li_history', ...
+        i_LOC_Na_history', ...
+        i_far_history', ...
+        eta_Li_history', ...
+        eta_Na_history', ...
+        R_Li_history', ...
+        R_Na_history', ...
+        E_Li_history', ...
+        E_Na_history', ...
+        C_s_Li_history', ...
+        C_s_Na_history', ...
+        C_Li_history', ...
+        C_Na_history', ...
+        phi_l_history', ...
+        selectivity_history', ...
+        'VariableNames', { ...
+        'Time_s', ...
+        'i_Li', ...
+        'i_Na', ...
+        'i_LOC_Li', ...
+        'i_LOC_Na', ...
+        'i_far', ...
+        'eta_Li', ...
+        'eta_Na', ...
+        'R_Li', ...
+        'R_Na', ...
+        'E_Li', ...
+        'E_Na', ...
+        'C_s_Li', ...
+        'C_s_Na', ...
+        'C_Li_bulk', ...
+        'C_Na_bulk', ...
+        'phi_l', ...
+        'Selectivity'});
+
+    writetable(T1, filename, 'Sheet', 'TimeSeries');
+
+    % --------------------------------------------------------------------
+    % Sheet 2: Time series including the initial concentrations
+    % --------------------------------------------------------------------
+    T2 = table( ...
+        time', ...
+        C_Li_history_plot', ...
+        C_Na_history_plot', ...
+        C_s_Li_history_plot', ...
+        C_s_Na_history_plot', ...
+        'VariableNames', { ...
+        'Time_s', ...
+        'C_Li_bulk', ...
+        'C_Na_bulk', ...
+        'C_s_Li_surface', ...
+        'C_s_Na_surface'});
+
+    writetable(T2, filename, 'Sheet', 'Concentrations');
+
+    % --------------------------------------------------------------------
+    % Sheet 3: Li particle concentration profiles
+    % --------------------------------------------------------------------
+    n_snapshots = min(10, last_valid_step);
+    snapshot_indices = unique(round(linspace( ...
+        1, last_valid_step, n_snapshots)));
+
+    radius_um = xr * r_p * 1e6;
+
+    Li_profile_names = cell(1, length(snapshot_indices) + 1);
+    Li_profile_names{1} = 'Radius_um';
+
+    for j = 1:length(snapshot_indices)
+        idx = snapshot_indices(j);
+        Li_profile_names{j+1} = sprintf( ...
+            'step_%d_t_%gs', idx, idx*dt);
+    end
+
+    Li_profile_names = matlab.lang.makeValidName(Li_profile_names);
+    Li_profile_names = matlab.lang.makeUniqueStrings(Li_profile_names);
+
+    T3 = array2table( ...
+        [radius_um, theta_Li_history(:, snapshot_indices)], ...
+        'VariableNames', Li_profile_names);
+
+    writetable(T3, filename, 'Sheet', 'Particle_Li');
+
+    % --------------------------------------------------------------------
+    % Sheet 4: Na particle concentration profiles
+    % --------------------------------------------------------------------
+    T4 = array2table( ...
+        [radius_um, theta_Na_history(:, snapshot_indices)], ...
+        'VariableNames', Li_profile_names);
+
+    writetable(T4, filename, 'Sheet', 'Particle_Na');
+
+    % --------------------------------------------------------------------
+    % Sheet 5: Model parameters
+    % --------------------------------------------------------------------
+    params = {
+        'C_Li_0_mol_m3',        C_Li_0;
+        'C_Na_0_mol_m3',        C_Na_0;
+        'NLR',                   NLR;
+        'C_max_mol_m3',         C_max;
+        'Applied_current',       I;
+        'dt_s',                  dt;
+        't_max_s',              t_max;
+        'L_m',                   L;
+        'L_sp_m',                L_sp;
+        'A_sp_m2',               A_sp;
+        'V_sp_m3',               V_sp;
+        'P_mA',                  P_mA;
+        'P_IHC',                 P_IHC;
+        'r_p_m',                 r_p;
+        'D_in_Li_m2_s',          D_in_Li;
+        'D_in_Na_m2_s',          D_in_Na;
+        'D_Li_m2_s',             D_Li;
+        'D_Na_m2_s',             D_Na;
+        'K_Li',                  K_Li;
+        'K_Na',                  K_Na;
+        'K_c_Li',                K_c_Li;
+        'K_a_Li',                K_a_Li;
+        'K_c_Na',                K_c_Na;
+        'K_a_Na',                K_a_Na;
+        'E_Li_ref_V',            E_Li_ref;
+        'E_Na_ref_V',            E_Na_ref;
+        'g_Li_V',                g_Li;
+        'g_Na_V',                g_Na;
+        'g_cross_V',             g_cross;
+        'k',                     k;
+        'alpha_transfer',        alpha_transfer;
+        'theta_Li_0',            theta_Li_0;
+        'theta_Na_0',            theta_Na_0;
+        'Valid_steps',            last_valid_step;
+        'Final_time_s',           last_valid_step*dt;
+        'Final_selectivity',      selectivity_history(end);
+        'Final_C_Li_bulk',        C_Li_history(end);
+        'Final_C_Na_bulk',        C_Na_history(end);
+        'Final_C_s_Li',           C_s_Li_history(end);
+        'Final_C_s_Na',           C_s_Na_history(end);
+        'Final_occupation_pct', ...
+        (C_s_Li_history(end) + k*C_s_Na_history(end))/C_max*100
+    };
+
+    T5 = cell2table(params, ...
+        'VariableNames', {'Parameter', 'Value'});
+
+    writetable(T5, filename, 'Sheet', 'Parameters');
+
+    fprintf('Excel export completed: %s\n', filename);
+
+else
+    warning('No valid simulation results were generated. Excel was not exported.');
 end
