@@ -100,7 +100,7 @@ clc; clear; close all;
 % PARAMETERS
 % ========================================================================
 
-% Aqueous diffusion coefficients [m^2 s^-1]
+% Aqueous diffusion coefficients [m^2 s^-1],  Retained for consistency/documentation; not explicitly used in the 0D model
 D_Li = 1.03e-9;
 D_Na = 1.33e-9;
 D_Cl = 2.03e-9;
@@ -137,7 +137,7 @@ k = 1.63;              % Na site-occupation coefficient [-]
 % Potential reference
 phi_s = 0;             % Uniform solid-phase reference potential [V]
 
-% Ionic charge numbers [-]
+% Ionic charge numbers [-],  Retained for consistency/documentation; not explicitly used in the 0D model
 z_Li = 1;
 z_Na = 1;
 z_Cl = -1;
