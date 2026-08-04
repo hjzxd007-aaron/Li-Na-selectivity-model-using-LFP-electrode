@@ -14,20 +14,23 @@ The **Flow-by simulation** implements a one-dimensional model along the electrod
 
 ```text
 .
-├── Frumkin fitting/
-│   └── Fit_frumkin.m
-├── Thermodynamic analysis/
-│   └── Thermo_analysis.m
-├── Flow-through simulation/
-│   ├── zeroD_main.m
-│   ├── zeroD_electrochemical_equations.m
-│   └── solve_theta_diffusion_all.m
-└── Flow-by simulation/
-    ├── main.m
-    ├── solve_step_linear_explicit.m
-    ├── solve_local_simple.m
-    ├── compute_flux.m
-    └── solve_theta_diffusion_all.m
+    Li-Na-selectivity-model-using-LFP-electrode/
+    ├── Frumkin fitting/
+    │   ├── Fit_frumkin.m
+    │   └── Capacity_LFP_NaCl.txt
+    ├── Thermodynamic analysis/
+    │   └── Thermo_analysis.m
+    ├── Flow-through simulation/
+    │   ├── zeroD_main.m
+    │   ├── zeroD_electrochemical_equations.m
+    │   └── solve_theta_diffusion_all.m
+    ├── Flow-by simulation/
+    │   ├── main.m
+    │   ├── solve_step_linear_explicit.m
+    │   ├── solve_local_simple.m
+    │   ├── compute_flux.m
+    │   └── solve_theta_diffusion_all.m
+    └── README.md
 ```
 
 ## Requirements
@@ -73,7 +76,11 @@ The input file must contain a potential column and either a `theta` column or a 
 
     theta = capacity/C_max
 
-The input filename is specified by `fname`. The script plots the fitted curve and exports the results to:
+The script currently expects an input file named:
+
+    Capacity_LFP_NaCl.txt
+
+The script plots the fitted curve and exports the results to:
 
     Frumkin_Fitting_Results.xlsx
 
@@ -204,7 +211,7 @@ Replace this placeholder with the final bibliographic information once the assoc
 
 ## License
 
-No license file is currently included in the repository. An appropriate open-source license, such as the MIT License or BSD 3-Clause License, should be added before permitting redistribution or reuse beyond the terms specified by the authors.
+No license file is currently included in this repository. Therefore, the code may be viewed, but reuse, modification, or redistribution is not permitted unless explicit permission is granted by the authors.
 
 ## Contact
 
