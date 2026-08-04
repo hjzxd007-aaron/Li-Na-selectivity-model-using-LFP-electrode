@@ -99,78 +99,78 @@ clc; clear; close all;
 % ========================================================================
 % PARAMETERS
 % ========================================================================
-D_Li = 1.03e-9; 
-D_Na = 1.33e-9; 
-D_Cl = 2.03e-9; %#ok<NASGU> % kept only for completeness
 
-F_const = 96485; 
-R = 8.314; 
-T = 298; 
-V_T = R*T/F_const;
+% Aqueous diffusion coefficients [m^2 s^-1]
+D_Li = 1.03e-9;
+D_Na = 1.33e-9;
+D_Cl = 2.03e-9;
 
-P_mA = 0.7; 
-P_sp = 1; 
-P_IHC = 0.1;
-L = 100e-6; 
-L_sp = 0.02; 
-C_max = 22800;%3000; 
-c0 = 1000;
-dt = 2; 
-t_max = 100*3600;
+% Physical constants
+F_const = 96485;       % Faraday constant [C mol^-1]
+R = 8.314;             % Gas constant [J mol^-1 K^-1]
+T = 298;               % Temperature [K]
+V_T = R*T/F_const;     % Thermal voltage [V]
 
-g_Li = -0.102; 
-g_Na = 0.0846;
-g_cross = -0.4;
+% Electrode and spacer properties
+P_mA = 0.7;            % Electrode macropore volume fraction [-]
+P_sp = 1;              % Spacer porosity [-]
+P_IHC = 0.1;           % Active-material volume fraction [-]
+L = 100e-6;            % Electrode thickness [m]
+L_sp = 0.02;           % Spacer length [m]
+A_sp = 25e-4;          % Electrode/spacer cross-sectional area [m^2]
+V_sp = 500e-6;         % Well-mixed electrolyte volume [m^3]
 
-E_Li_ref = 0.1; 
-E_Na_ref = -0.10956;
-k = 1.63;
+% Concentration and time parameters
+C_max = 22800;         % Maximum intercalation concentration [mol m^-3]
+c0 = 1000;             % Reference concentration [mol m^-3]
+dt = 2;                % Global time step [s]
+t_max = 100*3600;      % Maximum simulation time [s]
 
-phi_s = 0;
+% Frumkin thermodynamic parameters
+g_Li = -0.102;         % Li self-interaction parameter [V]
+g_Na = 0.0846;         % Na self-interaction parameter [V]
+g_cross = -0.4;        % Li-Na cross-interaction parameter [V]
+E_Li_ref = 0.1;        % Li reference potential [V]
+E_Na_ref = -0.10956;   % Na reference potential [V]
+k = 1.63;              % Na site-occupation coefficient [-]
 
-z_Li = 1; %#ok<NASGU>
-z_Na = 1; %#ok<NASGU>
-z_Cl = -1; %#ok<NASGU>
+% Potential reference
+phi_s = 0;             % Uniform solid-phase reference potential [V]
 
-NLR = 100;
-C_Na_0 = 500;
-C_Li_0 = C_Na_0 / NLR;
-C_Cl_0 = C_Na_0 + C_Li_0; 
-A_sp = 25e-4;
+% Ionic charge numbers [-]
+z_Li = 1;
+z_Na = 1;
+z_Cl = -1;
 
+% Initial electrolyte composition
+NLR = 100;                         % Initial Na/Li concentration ratio [-]
+C_Na_0 = 500;                      % Initial Na concentration [mol m^-3]
+C_Li_0 = C_Na_0/NLR;               % Initial Li concentration [mol m^-3]
+C_Cl_0 = C_Na_0 + C_Li_0;          % Initial Cl concentration [mol m^-3]
 
-I = -1/25*10;   % same sign convention as original code
+% Applied current
+I = -1/25*10;          % Applied geometric current density [A m^-2]
 
-V_sp = 500e-6;
+% Electrochemical parameters
+alpha_transfer = 0.5;  % Charge-transfer coefficient [-]
+n_Li = 1;              % Electrons transferred per Li reaction [-]
+n_Na = 1;              % Electrons transferred per Na reaction [-]
+v_Li = 1;              % Li stoichiometric coefficient [-]
+v_Na = 1;              % Na stoichiometric coefficient [-]
 
-alpha_transfer = 0.5;
-n_Li = 1; 
-n_Na = 1;
-v_Li = 1; 
-v_Na = 1;
+K_Li = 1e-13;          % Li kinetic parameter [m s^-1]
+K_Na = 0.1*K_Li;       % Na kinetic parameter [m s^-1]
 
-K_c_Li = 1e-10; 
-K_a_Li = 1e-10;
-%K_Li = K_c_Li^alpha_transfer * K_a_Li^(1-alpha_transfer) * C_max;
+% Particle parameters
+r_p = 500e-9;          % Particle radius [m]
+dr_p = 25e-9;          % Radial grid spacing [m]
+N = round(r_p/dr_p);   % Number of radial intervals [-]
+dx = 1/N;              % Dimensionless radial grid spacing [-]
 
-K_c_Na = 1e-10; 
-K_a_Na = 1e-10;
-%K_Na = K_c_Na^alpha_transfer * K_a_Na^(1-alpha_transfer) * C_max;
-
-K_Li = 1e-13;
-K_Na = 0.01*K_Li;
-% ========================================================================
-% PARTICLE
-% ========================================================================
-r_p = 500e-9; %500nm
-dr_p = 25e-9; %25nm
-N = round(r_p/dr_p); 
-dx = 1/N;
-
-D_in_Li = 1.03e-13; 
-D_in_Na = 2.28e-14;
-a_v = 3 * P_IHC / r_p;
-n_sub = 1000;
+D_in_Li = 1.03e-13;    % Li solid-state diffusivity [m^2 s^-1]
+D_in_Na = 2.28e-14;    % Na solid-state diffusivity [m^2 s^-1]
+a_v = 3*P_IHC/r_p;     % Specific interfacial area [m^2 m^-3]
+n_sub = 1000;          % Particle-diffusion substeps [-]
 
 xr = dx*(0:N)';
 
@@ -427,106 +427,200 @@ C_s_Na_history_plot = [C_s_Na_0, C_s_Na_history];
 % ========================================================================
 figure('Position', [100, 100, 700, 600]);
 
+% ------------------------------------------------------------------------
+% Bulk electrolyte concentrations
+% ------------------------------------------------------------------------
 subplot(2,3,1);
-plot(time, C_Na_history_plot, 'b-', 'LineWidth', 1.5, 'DisplayName', 'Na^+');
+
+plot(time, C_Na_history_plot, 'b-', ...
+    'LineWidth', 1.5, ...
+    'DisplayName', 'Na^+');
+
 hold on;
-plot(time, C_Li_history_plot, 'r-', 'LineWidth', 1.5, 'DisplayName', 'Li^+');
+
+plot(time, C_Li_history_plot, 'r-', ...
+    'LineWidth', 1.5, ...
+    'DisplayName', 'Li^+');
+
 legend('show', 'Location', 'best');
-title('Bulk / Spacer Concentration');
+title('Bulk Electrolyte Concentration');
 xlabel('Time (s)');
 ylabel('Concentration (mol m^{-3})');
 grid on;
 
+% ------------------------------------------------------------------------
+% Particle-surface concentrations
+% ------------------------------------------------------------------------
 subplot(2,3,2);
-plot(time, C_s_Na_history_plot, 'b-', 'LineWidth', 1.5, 'DisplayName', 'Na^+');
+
+plot(time, C_s_Na_history_plot, 'b-', ...
+    'LineWidth', 1.5, ...
+    'DisplayName', 'Na^+');
+
 hold on;
-plot(time, C_s_Li_history_plot, 'r-', 'LineWidth', 1.5, 'DisplayName', 'Li^+');
+
+plot(time, C_s_Li_history_plot, 'r-', ...
+    'LineWidth', 1.5, ...
+    'DisplayName', 'Li^+');
+
 legend('show', 'Location', 'best');
-title('Particle Surface Concentration');
+title('Particle-Surface Concentration');
 xlabel('Time (s)');
 ylabel('Concentration (mol m^{-3})');
 grid on;
 
+% ------------------------------------------------------------------------
+% Equilibrium potentials
+% ------------------------------------------------------------------------
 subplot(2,3,3);
-plot(time(2:end), E_Na_history, 'b-', 'LineWidth', 1.5, 'DisplayName', 'E_{Na}');
+
+plot(time(2:end), E_Na_history, 'b-', ...
+    'LineWidth', 1.5, ...
+    'DisplayName', 'E_{Na}');
+
 hold on;
-plot(time(2:end), E_Li_history, 'r-', 'LineWidth', 1.5, 'DisplayName', 'E_{Li}');
+
+plot(time(2:end), E_Li_history, 'r-', ...
+    'LineWidth', 1.5, ...
+    'DisplayName', 'E_{Li}');
+
 legend('show', 'Location', 'best');
 title('Equilibrium Potential');
 xlabel('Time (s)');
 ylabel('Potential (V)');
 grid on;
 
+% ------------------------------------------------------------------------
+% Overpotentials
+% ------------------------------------------------------------------------
 subplot(2,3,4);
-plot(time(2:end), eta_Na_history, 'b-', 'LineWidth', 1.5, 'DisplayName', '\eta_{Na}');
+
+plot(time(2:end), eta_Na_history, 'b-', ...
+    'LineWidth', 1.5, ...
+    'DisplayName', '\eta_{Na}');
+
 hold on;
-plot(time(2:end), eta_Li_history, 'r-', 'LineWidth', 1.5, 'DisplayName', '\eta_{Li}');
+
+plot(time(2:end), eta_Li_history, 'r-', ...
+    'LineWidth', 1.5, ...
+    'DisplayName', '\eta_{Li}');
+
 legend('show', 'Location', 'best');
 title('Overpotential');
 xlabel('Time (s)');
 ylabel('Overpotential (V)');
 grid on;
 
+% ------------------------------------------------------------------------
+% Li/Na selectivity
+% ------------------------------------------------------------------------
 subplot(2,3,5);
-plot(time(2:end), selectivity_history, 'k-', 'LineWidth', 1.5);
-title('Selectivity');
+
+plot(time(2:end), selectivity_history, 'k-', ...
+    'LineWidth', 1.5);
+
+title('Li/Na Selectivity');
 xlabel('Time (s)');
-ylabel('S_{Li/Na}');
+ylabel('S_{Li/Na} (-)');
 grid on;
 
+% ------------------------------------------------------------------------
+% Volumetric reaction rates
+% ------------------------------------------------------------------------
 subplot(2,3,6);
-plot(time(2:end), R_Li_history, 'r-', 'LineWidth', 1.5, 'DisplayName', 'R_{Li}');
+
+plot(time(2:end), R_Li_history, 'r-', ...
+    'LineWidth', 1.5, ...
+    'DisplayName', 'R_{Li}');
+
 hold on;
-plot(time(2:end), R_Na_history, 'b-', 'LineWidth', 1.5, 'DisplayName', 'R_{Na}');
+
+plot(time(2:end), R_Na_history, 'b-', ...
+    'LineWidth', 1.5, ...
+    'DisplayName', 'R_{Na}');
+
 legend('show', 'Location', 'best');
-title('Reaction Rate');
+title('Volumetric Reaction Rate');
 xlabel('Time (s)');
-ylabel('Rate (mol m^{-3} s^{-1})');
+ylabel('Reaction rate (mol m^{-3} s^{-1})');
 grid on;
 
-% particle profiles
+% ========================================================================
+% PARTICLE OCCUPANCY PROFILES
+% ========================================================================
 figure('Position', [150, 150, 800, 400]);
 
 time_steps_valid = last_valid_step;
-r_physical = xr * r_p * 1e6;
-time_indices = unique(round(linspace(1, max(time_steps_valid,1), min(5,max(time_steps_valid,1)))));
+r_physical = xr * r_p * 1e6;  % particle radius coordinate [um]
+
+time_indices = unique(round(linspace( ...
+    1, ...
+    max(time_steps_valid, 1), ...
+    min(5, max(time_steps_valid, 1)))));
+
 colors = jet(length(time_indices));
 
+% ------------------------------------------------------------------------
+% Li occupancy profiles
+% ------------------------------------------------------------------------
 subplot(1,2,1);
+
 for i = 1:length(time_indices)
+
     idx = time_indices(i);
+
     plot(r_physical, theta_Li_history(:, idx), '-', ...
-        'LineWidth', 1.5, 'Color', colors(i,:), ...
+        'LineWidth', 1.5, ...
+        'Color', colors(i,:), ...
         'DisplayName', sprintf('t = %.1f s', idx*dt));
+
     hold on;
 end
+
 legend('show', 'Location', 'best');
 title('Li^+ Occupancy in Particle');
 xlabel('Radius (\mum)');
-ylabel('\theta_{Li}');
+ylabel('\theta_{Li} (-)');
 grid on;
 
+% ------------------------------------------------------------------------
+% Na occupancy profiles
+% ------------------------------------------------------------------------
 subplot(1,2,2);
+
 for i = 1:length(time_indices)
+
     idx = time_indices(i);
+
     plot(r_physical, theta_Na_history(:, idx), '-', ...
-        'LineWidth', 1.5, 'Color', colors(i,:), ...
+        'LineWidth', 1.5, ...
+        'Color', colors(i,:), ...
         'DisplayName', sprintf('t = %.1f s', idx*dt));
+
     hold on;
 end
+
 legend('show', 'Location', 'best');
 title('Na^+ Occupancy in Particle');
 xlabel('Radius (\mum)');
-ylabel('\theta_{Na}');
+ylabel('\theta_{Na} (-)');
 grid on;
 
+% ========================================================================
+% COMMAND-WINDOW SUMMARY
+% ========================================================================
 fprintf('Simulation completed successfully!\n');
+
 if ~isempty(selectivity_history)
     fprintf('Final selectivity: %.4f\n', selectivity_history(end));
 end
+
 if ~isempty(C_s_Li_history)
-    fprintf('Final Li surface concentration: %.2f mol/m^3\n', C_s_Li_history(end));
-    fprintf('Final Na surface concentration: %.2f mol/m^3\n', C_s_Na_history(end));
+    fprintf('Final Li surface concentration: %.2f mol/m^3\n', ...
+        C_s_Li_history(end));
+
+    fprintf('Final Na surface concentration: %.2f mol/m^3\n', ...
+        C_s_Na_history(end));
 end
 
 % ========================================================================
@@ -536,15 +630,19 @@ fprintf('\nExporting results to Excel...\n');
 
 if last_valid_step > 0
 
-    % File name based on initial Li/Na concentrations and current time
+    % File name based on initial Li and Na concentrations and current time
     filename = sprintf('Results_Li%g_Na%g_%s.xlsx', ...
-        C_Li_0, C_Na_0, datestr(now, 'yyyymmdd_HHMMSS'));
+        C_Li_0, ...
+        C_Na_0, ...
+        datestr(now, 'yyyymmdd_HHMMSS'));
 
-    % --------------------------------------------------------------------
-    % Sheet 1: Time-series results
-    % --------------------------------------------------------------------
+    % ====================================================================
+    % Sheet 1: Time-series electrochemical results
+    % ====================================================================
+    %
     % time(2:end) corresponds to the calculated history variables because
-    % time(1) is the initial condition at t = 0.
+    % time(1) represents the initial condition at t = 0.
+    %
     T1 = table( ...
         time(2:end)', ...
         i_Li_history', ...
@@ -566,29 +664,29 @@ if last_valid_step > 0
         selectivity_history', ...
         'VariableNames', { ...
         'Time_s', ...
-        'i_Li', ...
-        'i_Na', ...
-        'i_LOC_Li', ...
-        'i_LOC_Na', ...
-        'i_far', ...
-        'eta_Li', ...
-        'eta_Na', ...
-        'R_Li', ...
-        'R_Na', ...
-        'E_Li', ...
-        'E_Na', ...
-        'C_s_Li', ...
-        'C_s_Na', ...
-        'C_Li_bulk', ...
-        'C_Na_bulk', ...
-        'phi_l', ...
-        'Selectivity'});
+        'i0_Li_A_m2', ...
+        'i0_Na_A_m2', ...
+        'iLOC_Li_A_m2', ...
+        'iLOC_Na_A_m2', ...
+        'iFar_A_m2', ...
+        'eta_Li_V', ...
+        'eta_Na_V', ...
+        'R_Li_mol_m3_s', ...
+        'R_Na_mol_m3_s', ...
+        'E_Li_V', ...
+        'E_Na_V', ...
+        'Cs_Li_surface_mol_m3', ...
+        'Cs_Na_surface_mol_m3', ...
+        'C_Li_bulk_mol_m3', ...
+        'C_Na_bulk_mol_m3', ...
+        'phi_l_V', ...
+        'Selectivity_dimensionless'});
 
     writetable(T1, filename, 'Sheet', 'TimeSeries');
 
-    % --------------------------------------------------------------------
-    % Sheet 2: Time series including the initial concentrations
-    % --------------------------------------------------------------------
+    % ====================================================================
+    % Sheet 2: Concentrations including initial conditions
+    % ====================================================================
     T2 = table( ...
         time', ...
         C_Li_history_plot', ...
@@ -597,29 +695,39 @@ if last_valid_step > 0
         C_s_Na_history_plot', ...
         'VariableNames', { ...
         'Time_s', ...
-        'C_Li_bulk', ...
-        'C_Na_bulk', ...
-        'C_s_Li_surface', ...
-        'C_s_Na_surface'});
+        'C_Li_bulk_mol_m3', ...
+        'C_Na_bulk_mol_m3', ...
+        'Cs_Li_surface_mol_m3', ...
+        'Cs_Na_surface_mol_m3'});
 
     writetable(T2, filename, 'Sheet', 'Concentrations');
 
-    % --------------------------------------------------------------------
-    % Sheet 3: Li particle concentration profiles
-    % --------------------------------------------------------------------
+    % ====================================================================
+    % Particle-profile snapshot selection
+    % ====================================================================
     n_snapshots = min(10, last_valid_step);
+
     snapshot_indices = unique(round(linspace( ...
-        1, last_valid_step, n_snapshots)));
+        1, ...
+        last_valid_step, ...
+        n_snapshots)));
 
     radius_um = xr * r_p * 1e6;
 
+    % ====================================================================
+    % Sheet 3: Li particle occupancy profiles
+    % ====================================================================
     Li_profile_names = cell(1, length(snapshot_indices) + 1);
     Li_profile_names{1} = 'Radius_um';
 
     for j = 1:length(snapshot_indices)
+
         idx = snapshot_indices(j);
+
         Li_profile_names{j+1} = sprintf( ...
-            'step_%d_t_%gs', idx, idx*dt);
+            'ThetaLi_step_%d_time_%g_s', ...
+            idx, ...
+            idx*dt);
     end
 
     Li_profile_names = matlab.lang.makeValidName(Li_profile_names);
@@ -631,61 +739,104 @@ if last_valid_step > 0
 
     writetable(T3, filename, 'Sheet', 'Particle_Li');
 
-    % --------------------------------------------------------------------
-    % Sheet 4: Na particle concentration profiles
-    % --------------------------------------------------------------------
+    % ====================================================================
+    % Sheet 4: Na particle occupancy profiles
+    % ====================================================================
+    Na_profile_names = cell(1, length(snapshot_indices) + 1);
+    Na_profile_names{1} = 'Radius_um';
+
+    for j = 1:length(snapshot_indices)
+
+        idx = snapshot_indices(j);
+
+        Na_profile_names{j+1} = sprintf( ...
+            'ThetaNa_step_%d_time_%g_s', ...
+            idx, ...
+            idx*dt);
+    end
+
+    Na_profile_names = matlab.lang.makeValidName(Na_profile_names);
+    Na_profile_names = matlab.lang.makeUniqueStrings(Na_profile_names);
+
     T4 = array2table( ...
         [radius_um, theta_Na_history(:, snapshot_indices)], ...
-        'VariableNames', Li_profile_names);
+        'VariableNames', Na_profile_names);
 
     writetable(T4, filename, 'Sheet', 'Particle_Na');
 
-    % --------------------------------------------------------------------
-    % Sheet 5: Model parameters
-    % --------------------------------------------------------------------
+    % ====================================================================
+    % Sheet 5: Model parameters and final results
+    % ====================================================================
     params = {
-        'C_Li_0_mol_m3',        C_Li_0;
-        'C_Na_0_mol_m3',        C_Na_0;
-        'NLR',                   NLR;
-        'C_max_mol_m3',         C_max;
-        'Applied_current',       I;
-        'dt_s',                  dt;
-        't_max_s',              t_max;
-        'L_m',                   L;
-        'L_sp_m',                L_sp;
-        'A_sp_m2',               A_sp;
-        'V_sp_m3',               V_sp;
-        'P_mA',                  P_mA;
-        'P_IHC',                 P_IHC;
-        'r_p_m',                 r_p;
-        'D_in_Li_m2_s',          D_in_Li;
-        'D_in_Na_m2_s',          D_in_Na;
-        'D_Li_m2_s',             D_Li;
-        'D_Na_m2_s',             D_Na;
-        'K_Li',                  K_Li;
-        'K_Na',                  K_Na;
-        'K_c_Li',                K_c_Li;
-        'K_a_Li',                K_a_Li;
-        'K_c_Na',                K_c_Na;
-        'K_a_Na',                K_a_Na;
-        'E_Li_ref_V',            E_Li_ref;
-        'E_Na_ref_V',            E_Na_ref;
-        'g_Li_V',                g_Li;
-        'g_Na_V',                g_Na;
-        'g_cross_V',             g_cross;
-        'k',                     k;
-        'alpha_transfer',        alpha_transfer;
-        'theta_Li_0',            theta_Li_0;
-        'theta_Na_0',            theta_Na_0;
-        'Valid_steps',            last_valid_step;
-        'Final_time_s',           last_valid_step*dt;
-        'Final_selectivity',      selectivity_history(end);
-        'Final_C_Li_bulk',        C_Li_history(end);
-        'Final_C_Na_bulk',        C_Na_history(end);
-        'Final_C_s_Li',           C_s_Li_history(end);
-        'Final_C_s_Na',           C_s_Na_history(end);
-        'Final_occupation_pct', ...
-        (C_s_Li_history(end) + k*C_s_Na_history(end))/C_max*100
+        'C_Li_0_mol_m3',                    C_Li_0;
+        'C_Na_0_mol_m3',                    C_Na_0;
+        'C_Cl_0_mol_m3',                    C_Cl_0;
+        'NLR_dimensionless',                 NLR;
+        'C_max_mol_m3',                     C_max;
+        'c0_mol_m3',                        c0;
+
+        'Applied_current_density_A_m2',      I;
+
+        'dt_s',                              dt;
+        't_max_s',                           t_max;
+
+        'L_m',                               L;
+        'L_sp_m',                            L_sp;
+        'A_sp_m2',                           A_sp;
+        'V_sp_m3',                           V_sp;
+
+        'P_mA_dimensionless',                P_mA;
+        'P_sp_dimensionless',                P_sp;
+        'P_IHC_dimensionless',               P_IHC;
+
+        'r_p_m',                             r_p;
+        'dr_p_m',                            dr_p;
+        'N_radial_intervals',                N;
+        'n_sub_dimensionless',               n_sub;
+
+        'D_in_Li_m2_s',                      D_in_Li;
+        'D_in_Na_m2_s',                      D_in_Na;
+        'D_Li_m2_s',                         D_Li;
+        'D_Na_m2_s',                         D_Na;
+        'D_Cl_m2_s',                         D_Cl;
+
+        'a_v_m2_m3',                         a_v;
+
+        'K_Li_mol_m2_s',                     K_Li;
+        'K_Na_mol_m2_s',                     K_Na;
+
+        'E_Li_ref_V',                        E_Li_ref;
+        'E_Na_ref_V',                        E_Na_ref;
+        'g_Li_V',                            g_Li;
+        'g_Na_V',                            g_Na;
+        'g_cross_V',                         g_cross;
+        'k_dimensionless',                   k;
+
+        'alpha_transfer_dimensionless',      alpha_transfer;
+        'n_Li_dimensionless',                n_Li;
+        'n_Na_dimensionless',                n_Na;
+        'v_Li_dimensionless',                v_Li;
+        'v_Na_dimensionless',                v_Na;
+
+        'phi_s_reference_V',                 phi_s;
+        'V_T_V',                             V_T;
+        'Temperature_K',                     T;
+
+        'theta_Li_0_dimensionless',          theta_Li_0;
+        'theta_Na_0_dimensionless',          theta_Na_0;
+
+        'Valid_steps',                       last_valid_step;
+        'Final_time_s',                      last_valid_step*dt;
+        'Final_selectivity_dimensionless',   selectivity_history(end);
+
+        'Final_C_Li_bulk_mol_m3',            C_Li_history(end);
+        'Final_C_Na_bulk_mol_m3',            C_Na_history(end);
+        'Final_Cs_Li_surface_mol_m3',        C_s_Li_history(end);
+        'Final_Cs_Na_surface_mol_m3',        C_s_Na_history(end);
+
+        'Final_weighted_occupation_pct', ...
+        (C_s_Li_history(end) + ...
+         k*C_s_Na_history(end))/C_max*100
     };
 
     T5 = cell2table(params, ...
@@ -696,5 +847,8 @@ if last_valid_step > 0
     fprintf('Excel export completed: %s\n', filename);
 
 else
-    warning('No valid simulation results were generated. Excel was not exported.');
+
+    warning(['No valid simulation results were generated. ', ...
+             'Excel was not exported.']);
+
 end
