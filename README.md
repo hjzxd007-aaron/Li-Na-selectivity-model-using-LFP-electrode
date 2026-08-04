@@ -190,7 +190,6 @@ Negative applied current corresponds to ion adsorption or intercalation.
 ## Notes and model limitations
 
 - The parameter values supplied in the scripts correspond to example or manuscript-specific simulation conditions and should be reviewed before applying the model to another electrode material or operating condition.
-- The Frumkin fitting module uses single-salt experimental data and does not account for direct Li-Na competition.
 - The thermodynamic analysis module assumes equilibrium and does not include Butler-Volmer kinetics or transport limitations.
 - The flow-through model assumes that the electrolyte composition is spatially uniform within the electrode macropores. Electrode-scale macropore concentration and potential gradients are therefore not explicitly represented.
 - The flow-by model uses a one-dimensional description along the electrode thickness direction.
