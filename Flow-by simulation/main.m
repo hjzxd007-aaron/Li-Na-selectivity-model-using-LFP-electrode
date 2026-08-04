@@ -81,7 +81,6 @@ T = 298;                   % Temperature [K]
 V_T = R * T / F_const; % Thermal voltage [V]
 
 P_mA  = 0.3;             % Electrode macropore volume fraction [-]
-P_mi  = 0.3;             % Micropore volume fraction [-]
 P_sp  = 1;               % Spacer porosity [-]
 P_IHC = 0.1;             % Active-material volume fraction [-]
 
