@@ -33,9 +33,11 @@ The **Flow-by simulation** implements a one-dimensional model along the electrod
 ## Requirements
 
 - MATLAB
-- Optimization Toolbox, used by `fsolve`
+- Optimization Toolbox, used by `lsqnonlin` in the Thermodynamic analysis module
 - Curve Fitting Toolbox, used by `fit` in the Frumkin fitting module
 - Symbolic Math Toolbox, used by `syms` and `vpasolve` during initialization of the flow-through model
+
+The Flow-by simulation uses standard MATLAB functions and does not require an additional toolbox beyond MATLAB.
 
 Some scripts export simulation results to Excel-compatible `.xlsx` files.
 
