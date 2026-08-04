@@ -5,6 +5,38 @@ function F = zeroD_electrochemical_equations(x, ...
     theta_Li_surface_last, theta_Na_surface_last, phi_s)
 
 % ========================================================================
+% ZEROD_ELECTROCHEMICAL_EQUATIONS Residual equations for the 0D
+% flow-through Li/Na competitive intercalation model.
+%
+% This function returns the residual vector used by FSOLVE at each time
+% step of the flow-through simulation. The nonlinear system couples:
+%
+%   1. Li and Na exchange-current expressions
+%   2. Butler-Volmer interfacial kinetics
+%   3. Galvanostatic current partitioning
+%   4. Li and Na overpotential definitions
+%   5. Interfacial reaction-rate relations
+%   6. Competitive Frumkin equilibrium potentials
+%   7. Particle-surface concentration constraints
+%   8. Well-mixed electrolyte mass balances
+%
+% Syntax:
+%   F = zeroD_electrochemical_equations(x, ...)
+%
+% Input:
+%   x       : vector containing the 15 electrochemical unknowns
+%
+% Output:
+%   F       : 15-by-1 residual vector. A converged solution satisfies
+%             F approximately equal to zero.
+%
+% Sign convention:
+%   Negative applied current corresponds to ion intercalation.
+%
+% Concentrations are expressed in mol m^-3, current densities in A m^-2,
+% reaction rates in mol m^-3 s^-1, and potentials in V.
+%
+% Unknown vector:
 % Reduced nonlinear algebraic system for flow-through operation
 % 15 unknowns / 15 equations
 %
@@ -99,8 +131,8 @@ F(12) = C_s_Li - theta_Li_surface_last*C_max;
 F(13) = C_s_Na - theta_Na_surface_last*C_max;
 
 % ===================== (14-15) bulk mass balances =====================
-F(14) = P_sp * V_sp * (C_Li - C_Li_last) / dt + A_sp * L * R_Li;
-F(15) = P_sp * V_sp * (C_Na - C_Na_last) / dt + A_sp * L * R_Na;
+F(14) = P_sp * V_sp * (C_Li - C_Li_last) / dt - A_sp * L * R_Li;
+F(15) = P_sp * V_sp * (C_Na - C_Na_last) / dt - A_sp * L * R_Na;
 
 F = double(F);
 
