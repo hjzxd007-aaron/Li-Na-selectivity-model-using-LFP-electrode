@@ -1,3 +1,99 @@
+%% ========================================================================
+%  ZERO-DIMENSIONAL FLOW-THROUGH Li/Na SELECTIVITY SIMULATION
+% ========================================================================
+%
+% Purpose:
+% This script simulates Li/Na competitive intercalation in a flow-through
+% electrode using a zero-dimensional electrochemical model.
+%
+% The electrolyte composition within the electrode macropores is assumed
+% to be spatially uniform. Therefore, concentration and potential gradients
+% along the electrode thickness direction are not explicitly resolved.
+%
+% The model couples:
+%
+%   1. Competitive Frumkin thermodynamics for Li/Na co-intercalation
+%   2. Butler-Volmer interfacial kinetics
+%   3. Galvanostatic current partitioning between Li and Na reactions
+%   4. Mass balances for the well-mixed electrolyte
+%   5. Radial solid-state diffusion in spherical active-material particles
+%
+% Required files:
+%
+%   1. This main script
+%   2. zeroD_electrochemical_equations.m
+%   3. solve_theta_diffusion_all.m
+%
+% Main user-defined parameters:
+%
+%   NLR
+%       Initial Na/Li concentration ratio.
+%
+%   C_Na_0
+%       Initial Na concentration in the electrolyte.
+%
+%   I
+%       Applied current density. Negative current corresponds to
+%       intercalation under the sign convention used in this code.
+%
+%   dt, t_max
+%       Time-step size and maximum simulation time.
+%
+%   C_max
+%       Maximum intercalation concentration.
+%
+%   E_Li_ref, E_Na_ref
+%       Reference intercalation potentials for Li and Na.
+%
+%   g_Li, g_Na, g_cross, k
+%       Competitive Frumkin thermodynamic parameters.
+%
+%   K_Li, K_Na
+%       Li and Na kinetic parameters used in the Butler-Volmer model.
+%
+%   r_p, D_in_Li, D_in_Na
+%       Particle radius and solid-state diffusion coefficients.
+%
+% Termination criterion:
+%
+% The simulation stops when the weighted electrode occupation exceeds:
+%
+%   C_s_Li + k*C_s_Na > 0.95*C_max
+%
+% Outputs:
+%
+% The script generates figures showing:
+%
+%   - bulk Li and Na concentrations
+%   - particle-surface Li and Na concentrations
+%   - equilibrium potentials
+%   - overpotentials
+%   - reaction rates
+%   - Li/Na selectivity
+%   - radial Li and Na particle-occupation profiles
+%
+% The script also exports the simulation results to:
+%
+%   Results_Li<value>_Na<value>_<timestamp>.xlsx
+%
+% The workbook contains:
+%
+%   - TimeSeries
+%   - Concentrations
+%   - Particle_Li
+%   - Particle_Na
+%   - Parameters
+%
+% Required MATLAB toolboxes:
+%
+%   Optimization Toolbox
+%       Used by fsolve.
+%
+%   Symbolic Math Toolbox
+%       Used by syms and vpasolve during initialization.
+%
+% ========================================================================
+
 clc; clear; close all;
 
 % ========================================================================
