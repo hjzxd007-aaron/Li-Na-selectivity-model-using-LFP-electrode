@@ -529,11 +529,7 @@ parameter_data = {
     'E_Na_ref_V', E_Na_ref;
     'phi_s_ref_V', phi_s_ref;
     'alpha_transfer_dimensionless', alpha_transfer;
-    'K_c_Li_m_s', K_c_Li;
-    'K_a_Li_m_s', K_a_Li;
     'K_Li_mol_m2_s', K_Li;
-    'K_c_Na_m_s', K_c_Na;
-    'K_a_Na_m_s', K_a_Na;
     'K_Na_mol_m2_s', K_Na;
     'r_p_m', r_p;
     'dr_p_m', dr_p;
