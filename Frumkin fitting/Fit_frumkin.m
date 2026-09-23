@@ -353,6 +353,16 @@ fit_options.Upper = [1, 3];
 E_ref = fitted_curve.E_ref;
 g_i = fitted_curve.g_i;
 
+% 95% confidence intervals of fitted parameters
+CI95 = confint(fitted_curve, 0.95);
+
+E_ref_CI95 = CI95(:,1);
+g_i_CI95   = CI95(:,2);
+
+fprintf('\n95%% confidence intervals:\n');
+fprintf('  E_ref: %.6f to %.6f V\n', E_ref_CI95(1), E_ref_CI95(2));
+fprintf('  g_i:   %.6f to %.6f V\n', g_i_CI95(1), g_i_CI95(2));
+
 R_squared = gof.rsquare;
 RMSE = gof.rmse;
 
@@ -436,6 +446,10 @@ parameter_names = {
     'RMSE (V)'
     'C_max (mAh/g)'
     'Number of Points'
+    'E_ref 95% CI lower (V)'
+    'E_ref 95% CI upper (V)'
+    'g_i 95% CI lower (V)'
+    'g_i 95% CI upper (V)'
 };
 
 parameter_values = {
@@ -450,6 +464,10 @@ parameter_values = {
     RMSE
     C_max
     numel(theta_valid)
+    E_ref_CI95(1)
+    E_ref_CI95(2)
+    g_i_CI95(1)
+    g_i_CI95(2)
 };
 
 parameter_table = table( ...
