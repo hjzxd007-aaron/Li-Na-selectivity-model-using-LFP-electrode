@@ -28,7 +28,7 @@ function [theta_Li_new, theta_Na_new, ...
 %   - Sub-stepping for particle diffusion
 %   - Reaction blocking under Li depletion and site saturation
 %   - Detection of negative Li and Na concentrations
-%   - Electroneutrality constraint for macropore Cl concentration
+%   - Electroneutrality constraint for macropore and spacer Cl
 %
 % Outputs:
 %   Updated concentrations and diagnostic variables
@@ -68,13 +68,13 @@ E_Li = params.E_Li_ref ...
 E_Na = params.E_Na_ref ...
      + V_T * log(C_mA_Na_safe / params.c0) ...
      - V_T * log(params.k * theta_s_Na ./ den) ...
-     - params.g_Na * theta_s_Na ...
+     - params.g_Na * params.k * theta_s_Na ...
      - params.g_cross * theta_s_Li ...
      - params.miu_Na;
 
 %% =======================================================================
 % 2. Reaction availability
-% =======================================================================
+% ========================================================================
 
 % Surface occupancies (N_x x 1)
 theta_Li_surf = theta_Li(end, :)';
@@ -95,7 +95,7 @@ params.allow_Na = ~site_saturated;
 
 %% =======================================================================
 % 3. Electrochemical coupling (local potentials and currents)
-% =======================================================================
+% ========================================================================
 
 sol = solve_local_simple(E_Li, E_Na, ...
                          C_s_Li, C_s_Na, ...
@@ -112,8 +112,9 @@ i_LOC_Na = sol.i_LOC_Na;
 
 %% =======================================================================
 % 4. Ionic fluxes
-% =======================================================================
+% ========================================================================
 
+% The face electrolyte current is passed to the Nernst-Planck solver.
 [J_Li, J_Na, J_Cl] = compute_flux(phi_l_half, ...
                                   C_mA_Li, C_mA_Na, C_mA_Cl, ...
                                   C_sp_Li, C_sp_Na, C_sp_Cl, ...
@@ -121,7 +122,7 @@ i_LOC_Na = sol.i_LOC_Na;
 
 %% =======================================================================
 % 5. Reaction rates
-% =======================================================================
+% ========================================================================
 
 R_Li = params.v_Li * params.a_v / ...
        (params.n_Li * F_const) * i_LOC_Li;
@@ -138,7 +139,7 @@ diagnostics.I_Faradaic_after_block = I_Faradaic_after_block;
 
 %% =======================================================================
 % 6. Solid-phase diffusion (particle-scale)
-% =======================================================================
+% ========================================================================
 
 theta_Li_new = theta_Li;
 theta_Na_new = theta_Na;
@@ -157,7 +158,7 @@ end
 
 %% =======================================================================
 % 7. Macropore concentration update (mass conservation)
-% =======================================================================
+% ========================================================================
 
 % Divergence of ionic fluxes
 div_J_Li = (J_Li(2:end) - J_Li(1:end-1)) / dx;
@@ -215,19 +216,20 @@ C_mA_Na_new = max(C_mA_Na_trial, eps_protect);
 % Cl concentration update (electroneutrality)
 % ------------------------------------------------------------------------
 
-% Enforce local electroneutrality for the Li+/Na+/Cl- system
+% Enforce local electroneutrality for the Li+/Na+/Cl- system.
+% Cl is not independently integrated inside the electrode macropores.
 C_mA_Cl_new = C_mA_Li_new + C_mA_Na_new;
 
 %% =======================================================================
 % 8. Spacer concentration update
-% =======================================================================
+% ========================================================================
 
 % Ionic fluxes at the electrode-spacer boundary
 J_R_Li = J_Li(end);
 J_R_Na = J_Na(end);
 J_R_Cl = J_Cl(end);
 
-% Well-mixed spacer mass balances
+% Well-mixed spacer mass balances for Li and Na
 C_sp_Li_new = max( ...
     C_sp_Li + (J_R_Li * params.A_sp / params.V_sp) * dt, ...
     eps_protect);
@@ -236,15 +238,53 @@ C_sp_Na_new = max( ...
     C_sp_Na + (J_R_Na * params.A_sp / params.V_sp) * dt, ...
     eps_protect);
 
-C_sp_Cl_new = max( ...
-    C_sp_Cl + (J_R_Cl * params.A_sp / params.V_sp) * dt, ...
-    eps_protect);
+% ------------------------------------------------------------------------
+% Spacer Cl concentration update (electroneutrality)
+% ------------------------------------------------------------------------
+
+% Enforce electroneutrality in the well-mixed spacer.
+%
+% The external charge-compensation process is not explicitly modeled.
+% The resulting Cl concentration represents an electroneutral bulk
+% solution, rather than an independent Cl mass balance with only the
+% electrode-spacer boundary flux.
+C_sp_Cl_new = C_sp_Li_new + C_sp_Na_new;
+
+% ------------------------------------------------------------------------
+% External charge-compensation diagnostics
+% ------------------------------------------------------------------------
+
+% Cl-equivalent molar flux required to reconcile the electrode boundary
+% Cl flux with the electroneutral spacer update [mol m^-2 s^-1].
+%
+% This is an equivalent charge-compensation flux, not necessarily an
+% actual additional Cl transport pathway.
+J_Cl_compensation = J_R_Li + J_R_Na - J_R_Cl;
+
+% Boundary electrolyte current reconstructed from NP ionic fluxes
+% [A m^-2].
+i_l_boundary_from_flux = F_const * J_Cl_compensation;
+
+% Hypothetical spacer Cl concentration without external compensation.
+% Retained only as a diagnostic; not used as the updated concentration.
+C_sp_Cl_no_compensation = C_sp_Cl + ...
+    (J_R_Cl * params.A_sp / params.V_sp) * dt;
 
 %% =======================================================================
 % Diagnostics
-% =======================================================================
+% ========================================================================
 
 diagnostics.success = true;
+
+% External charge-compensation diagnostics
+diagnostics.J_Cl_compensation = J_Cl_compensation;
+diagnostics.i_l_boundary_from_flux = i_l_boundary_from_flux;
+diagnostics.i_l_boundary_target = sol.i_l_face(end);
+diagnostics.C_sp_Cl_no_compensation = C_sp_Cl_no_compensation;
+
+% Spacer electroneutrality residual [mol m^-3]
+diagnostics.spacer_charge_residual = ...
+    C_sp_Li_new + C_sp_Na_new - C_sp_Cl_new;
 
 % Electrolyte and solid-phase potentials
 diagnostics.phi_l_half = phi_l_half;
