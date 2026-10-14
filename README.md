@@ -14,7 +14,7 @@ The **Flow-by simulation** implements a one-dimensional model along the electrod
 
 ```text
 .
-    Li-Na-selectivity-model-using-LFP-electrode/
+└── Li-Na-selectivity-model-using-LFP-electrode/
     ├── Frumkin fitting/
     │   ├── Fit_frumkin.m
     │   └── Capacity_LFP_NaCl.txt
@@ -36,8 +36,8 @@ The **Flow-by simulation** implements a one-dimensional model along the electrod
 ## Requirements
 
 - MATLAB
-- Curve Fitting Toolbox, used by `fit` in the Frumkin fitting module 
-- Optimization Toolbox, used by `lsqnonlin` in the Thermodynamic analysis module and used by `fsolve` in the flow-through simulation
+- Curve Fitting Toolbox, used by `fit` in the Frumkin fitting module
+- Optimization Toolbox, used by `lsqnonlin` in the Thermodynamic analysis module and by `fsolve` in the flow-through simulation
 - Symbolic Math Toolbox, used by `syms` and `vpasolve` during initialization of the flow-through model
 
 The Flow-by simulation uses standard MATLAB functions and does not require an additional toolbox beyond MATLAB.
@@ -143,36 +143,54 @@ The flow-by module implements a one-dimensional electrochemical model along the 
 The model couples:
 
 - one-dimensional Nernst-Planck transport of Li, Na, and Cl;
-- electrolyte and solid-phase potential distributions;
+- electrolyte- and solid-phase potential distributions;
 - competitive Frumkin thermodynamics;
-- Butler-Volmer interfacial kinetics; and
+- Butler-Volmer interfacial kinetics and Li/Na current partitioning; and
 - radial solid-state diffusion at each axial location.
+
+The electrochemical solver determines the local reaction currents and potential distributions under a prescribed total applied current. Local reaction availability is constrained by Li depletion and weighted site occupancy. These constraints are incorporated into the electrochemical solution rather than applied as corrections after the current distribution has been calculated.
+
+The model uses explicit time integration for macropore concentrations, with adaptive time-step subdivision when a trial update produces negative Li or Na concentrations. Local electroneutrality is imposed when updating the macropore Cl concentration.
 
 Main files:
 
 - `main.m`: defines parameters, runs the simulation, and exports data
 - `solve_step_linear_explicit.m`: advances the coupled transport-reaction model
-- `solve_local_simple.m`: solves the local electrochemical problem
+- `solve_local_simple.m`: solves the coupled electrochemical potential and current distributions under the applied-current constraint
 - `compute_flux.m`: calculates macropore ion fluxes
 - `solve_theta_diffusion_all.m`: solves radial particle diffusion
+
+The simulation terminates when at least 99% of the axial locations reach the prescribed surface-occupancy threshold:
+
+    theta_Li,surface + k * theta_Na,surface >= 0.95
+
+The simulation is performed under continuous constant-current operation.
 
 The script exports the simulation results to:
 
     simulation_NLR<value>_I<value>.xlsx
 
-The output includes electrolyte concentration profiles, particle occupations, reaction rates, potential distributions, and Li/Na selectivity.
+The output includes electrolyte concentration profiles, particle occupations, local reaction currents, reaction rates, electrolyte- and solid-phase potential distributions, and Li/Na selectivity calculated from solid-phase intercalation.
 
 ---
 
-## Selectivity definitions
+## Selectivity definition
 
-The electrolyte-depletion-based selectivity is calculated as:
+Li/Na selectivity is defined based on the amounts of Li and Na intercalated into the electrode active material:
 
-    S_Li/Na = (1 - C_Li/C_Li,0) / (1 - C_Na/C_Na,0)
+    S_Li/Na = (Delta_n_Li / Delta_n_Na) * NLR
 
-The flow-by model also calculates an electrode-uptake-based selectivity from the changes in average Li and Na occupation.
+where:
 
-Very early-time selectivity values may be unstable when Na uptake is close to zero.
+    NLR = C_Na,0 / C_Li,0
+
+and `Delta_n_Li` and `Delta_n_Na` are the net amounts of Li and Na intercalated into the solid phase, respectively.
+
+For the electrode models, the intercalated amounts are determined from changes in solid-phase ion inventories. When radial concentration gradients are resolved, particle-volume-averaged occupancies are used to determine these inventories.
+
+This definition excludes ions remaining in the electrode macropore electrolyte and therefore characterizes the intrinsic Li/Na selectivity of the intercalation process.
+
+Very early-time selectivity values may be unstable when Na intercalation approaches zero.
 
 ## Units and sign convention
 
@@ -193,9 +211,10 @@ Negative applied current corresponds to ion adsorption or intercalation.
 - The thermodynamic analysis module assumes equilibrium and does not include Butler-Volmer kinetics or transport limitations.
 - The flow-through model assumes that the electrolyte composition is spatially uniform within the electrode macropores. Electrode-scale macropore concentration and potential gradients are therefore not explicitly represented.
 - The flow-by model uses a one-dimensional description along the electrode thickness direction.
+- In the flow-by model, reaction availability is constrained by prescribed Li-depletion and site-occupancy thresholds. These thresholds are numerical modeling assumptions rather than independently derived kinetic laws.
 - Active-material particles are represented as spheres with radial solid-state diffusion.
 - Activity-coefficient corrections, parasitic reactions, mechanical deformation, and detailed moving phase-boundary dynamics are not explicitly included.
-- Numerical safeguards, including concentration floors, capacity limits, and limits on selected potential updates, are included to improve numerical robustness.
+- Numerical safeguards include concentration floors, occupancy limits, bounded potential updates, and adaptive time-step subdivision following negative-concentration errors. Numerical convergence should be verified for the selected operating conditions.
 - The experimental data file required by the Frumkin fitting module is not included in the current code archive and must be supplied separately.
 
 ## Citation
