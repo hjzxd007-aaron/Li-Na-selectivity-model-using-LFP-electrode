@@ -116,7 +116,8 @@ i_LOC_Na = sol.i_LOC_Na;
 
 [J_Li, J_Na, J_Cl] = compute_flux(phi_l_half, ...
                                   C_mA_Li, C_mA_Na, C_mA_Cl, ...
-                                  C_sp_Li, C_sp_Na, C_sp_Cl, params);
+                                  C_sp_Li, C_sp_Na, C_sp_Cl, ...
+                                  params, sol.i_l_face);
 
 %% =======================================================================
 % 5. Reaction rates
