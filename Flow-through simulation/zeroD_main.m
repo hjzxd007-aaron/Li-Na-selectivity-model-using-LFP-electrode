@@ -1,3 +1,4 @@
+
 %% ========================================================================
 %  ZERO-DIMENSIONAL FLOW-THROUGH Li/Na SELECTIVITY SIMULATION
 % ========================================================================
@@ -201,6 +202,13 @@ C_s_Na_0 = theta_Na_0 * C_max;
 theta_Li_profile = theta_Li_0 * ones(N+1,1);
 theta_Na_profile = theta_Na_0 * ones(N+1,1);
 
+% Spherical particle-volume weights for solid-phase inventory
+r_nodes = linspace(0, 1, N+1)';
+r_edges = [0; ...
+    0.5*(r_nodes(1:end-1) + r_nodes(2:end)); ...
+    1];
+radial_weights = diff(r_edges.^3);
+
 C_Li_last = C_Li_0;
 C_Na_last = C_Na_0;
 phi_l_last = 0;
@@ -367,8 +375,21 @@ for t = 1:time_steps
     theta_Li_history(:, t) = theta_Li_new;
     theta_Na_history(:, t) = theta_Na_new;
 
-    selectivity_history(t) = (1 - C_Li_solved / C_Li_0) / ...
-                             (1 - C_Na_solved / C_Na_0);
+    % Volume-averaged particle occupancies
+    theta_Li_avg = sum(radial_weights .* theta_Li_new);
+    theta_Na_avg = sum(radial_weights .* theta_Na_new);
+
+    % Net solid-phase intercalation from the initial state
+    delta_theta_Li = theta_Li_avg - theta_Li_0;
+    delta_theta_Na = theta_Na_avg - theta_Na_0;
+
+    % Li/Na selectivity based on actual solid-phase intercalation
+    if abs(delta_theta_Na) > 1e-12
+        selectivity_history(t) = ...
+            (delta_theta_Li / delta_theta_Na) * NLR;
+    else
+        selectivity_history(t) = NaN;
+    end
 
     last_valid_step = t;
 
