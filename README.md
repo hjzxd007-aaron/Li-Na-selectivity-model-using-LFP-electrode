@@ -229,7 +229,6 @@ Negative applied current corresponds to ion adsorption or intercalation.
 - The flow-by current-closure calculation does not by itself verify consistency of all electrolyte potential and concentration fields; coupled numerical validation remains necessary.
 - The flow-through code retains post-solve reaction-rate limiting and a fallback after unsuccessful nonlinear solves. These safeguards can affect mass-balance consistency and should be checked when interpreting quantitative results.
 - Numerical safeguards include concentration floors, occupancy limits, bounded potential updates, and adaptive time-step subdivision following negative-concentration errors. Numerical convergence and Li/Na inventory balances should be verified for the selected operating conditions.
-- The experimental data file required by the Frumkin fitting module is not included in the current code archive and must be supplied separately.
 
 ## Citation
 
