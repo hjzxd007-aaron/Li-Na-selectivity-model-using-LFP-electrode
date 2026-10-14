@@ -112,9 +112,9 @@ T = 298;               % Temperature [K]
 V_T = R*T/F_const;     % Thermal voltage [V]
 
 % Electrode and spacer properties
-P_mA = 0.7;            % Electrode macropore volume fraction [-]
+P_mA = 0.85;            % Electrode macropore volume fraction [-]
 P_sp = 1;              % Spacer porosity [-]
-P_IHC = 0.1;           % Active-material volume fraction [-]
+P_IHC = 0.05;           % Active-material volume fraction [-]
 L = 100e-6;            % Electrode thickness [m]
 L_sp = 0.02;           % Spacer length [m]
 A_sp = 25e-4;          % Electrode/spacer cross-sectional area [m^2]
@@ -158,8 +158,8 @@ n_Na = 1;              % Electrons transferred per Na reaction [-]
 v_Li = 1;              % Li stoichiometric coefficient [-]
 v_Na = 1;              % Na stoichiometric coefficient [-]
 
-K_Li = 1e-13;          % Li kinetic parameter [mol m^-2 s^-1]
-K_Na = 0.1*K_Li;       % Na kinetic parameter [mol m^-2 s^-1]
+K_Li = 1e-6;          % Li kinetic parameter [mol m^-2 s^-1]
+K_Na = 0.5*K_Li;       % Na kinetic parameter [mol m^-2 s^-1]
 
 % Particle parameters
 r_p = 500e-9;          % Particle radius [m]
