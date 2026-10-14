@@ -140,6 +140,9 @@ end
 dphi_R = phi_l_half(end) - phi_l_half(end-1);
 dphi_R = max(min(dphi_R, 0.05), -0.05);
 
+% Distance from the last cell center to the boundary face [m]
+dx_R = dx / 2;
+
 % Boundary concentration differences [mol m^-3]
 dC_Li_R = C_sp_Li - C_mA_Li(end);
 dC_Na_R = C_sp_Na - C_mA_Na(end);
@@ -152,12 +155,12 @@ C_Cl_avg_R = max(0.5*(C_sp_Cl + C_mA_Cl(end)), 1e-8);
 
 % Boundary Nernst-Planck fluxes [mol m^-2 s^-1]
 J_Li(N_x+1) = -params.D_Li_eff * ...
-    (dC_Li_R/dx + params.z_Li*C_Li_avg_R*dphi_R/(V_T*dx));
+    (dC_Li_R/dx_R + params.z_Li*C_Li_avg_R*dphi_R/(V_T*dx_R));
 
 J_Na(N_x+1) = -params.D_Na_eff * ...
-    (dC_Na_R/dx + params.z_Na*C_Na_avg_R*dphi_R/(V_T*dx));
+    (dC_Na_R/dx_R + params.z_Na*C_Na_avg_R*dphi_R/(V_T*dx_R));
 
 J_Cl(N_x+1) = -params.D_Cl_eff * ...
-    (dC_Cl_R/dx + params.z_Cl*C_Cl_avg_R*dphi_R/(V_T*dx));
+    (dC_Cl_R/dx_R + params.z_Cl*C_Cl_avg_R*dphi_R/(V_T*dx_R));
 
 end
