@@ -2,7 +2,7 @@ function [theta_Li_new, theta_Na_new] = solve_theta_diffusion_all( ...
     theta_Li_last, theta_Na_last, ...
     R_Li, R_Na, ...
     D_in_Li, D_in_Na, ...
-    C_max, a_v, r_p, dx, dt, N, n_sub, k)
+    C_max, a_v, r_p, dx, dt, N, n_sub)
 % ========================================================================
 % solve_theta_diffusion_all
 % ------------------------------------------------------------------------
@@ -33,7 +33,6 @@ function [theta_Li_new, theta_Na_new] = solve_theta_diffusion_all( ...
 %   dt                            - Time step (s)
 %   N                             - Number of radial grid points
 %   n_sub                         - Number of sub-time steps
-%   k                             - Site occupation coefficient for Na⁺
 %
 % Outputs:
 %   theta_Li_new, theta_Na_new    - Updated concentration profiles
@@ -108,19 +107,12 @@ function [theta_Li_new, theta_Na_new] = solve_theta_diffusion_all( ...
 
     end
 
-    % ====================================================================
+        % ====================================================================
     % Numerical safeguards
     % ====================================================================
 
-    % Enforce non-negativity
-    theta_Li_new = max(theta_Li_new, 0);
-    theta_Na_new = max(theta_Na_new, 0);
-
-    % Diagnostic check for weighted site occupancy
-    tol_occ = 1e-8;
-    if any(theta_Li_new + k * theta_Na_new > 1 + tol_occ)
-        warning(['Weighted site occupancy exceeds unity beyond tolerance ', ...
-                 'during particle diffusion update.']);
-    end
+    % Restrict individual ion occupancies to [0, 1]
+    theta_Li_new = min(max(theta_Li_new, 0), 1);
+    theta_Na_new = min(max(theta_Na_new, 0), 1);
 
 end
