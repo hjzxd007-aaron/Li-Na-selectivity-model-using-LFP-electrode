@@ -262,7 +262,7 @@ params.phi_s_ref = phi_s_ref;
 %% ========================================================================
 %  HISTORY ARRAYS
 % ========================================================================
-n_save  = 10000;
+n_save  = 100;
 n_saved = min(10000, ceil(n_steps / n_save));
 
 history = struct();
@@ -386,7 +386,7 @@ for t_step = 1:n_steps
     reached_capacity = (fraction_saturated >= 0.99);
 
     % Always save the final state, even between regular save intervals.
-    if mod(t_step, n_save) == 0 || reached_capacity
+    if mod(t_step, n_save) == 0 || reached_capacity || t_step == n_steps
 
         history.t(save_idx) = current_time;
 
