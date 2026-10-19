@@ -87,7 +87,7 @@ theta_total = theta_Li_surf + params.k * theta_Na_surf;
 site_saturated = (theta_total >= 0.95);
 
 % Block Li reaction when macropore Li is depleted
-Li_depleted = (C_mA_Li <= 1e-4);
+Li_depleted = (C_mA_Li <= 1e-6);
 
 % Reaction masks passed to the local electrochemical solver
 params.allow_Li = ~site_saturated & ~Li_depleted;
