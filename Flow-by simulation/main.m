@@ -380,7 +380,7 @@ for t_step = 1:n_steps
         break;
     end
 
-    % Stop when at least 99% of the electrode reaches surface occupancy 0.95.
+    % Stop when 100% of the electrode reaches surface occupancy 0.95.
     theta_total_surf = theta_Li(end, :) + params.k * theta_Na(end, :);
     fraction_saturated = mean(theta_total_surf >= 0.95);
     reached_capacity = (fraction_saturated >= 1);
