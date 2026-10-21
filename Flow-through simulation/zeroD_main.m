@@ -116,10 +116,10 @@ V_T = R*T/F_const;     % Thermal voltage [V]
 P_mA = 0.85;            % Electrode macropore volume fraction [-]
 P_sp = 1;              % Spacer porosity [-]
 P_IHC = 0.05;           % Active-material volume fraction [-]
-L = 100e-6;            % Electrode thickness [m]
+L = 200e-6;            % Electrode thickness [m]
 L_sp = 0.02;           % Spacer length [m]
 A_sp = 25e-4;          % Electrode/spacer cross-sectional area [m^2]
-V_sp = 500e-6;         % Well-mixed electrolyte volume [m^3]
+V_sp = 500e-6;         % Well-mixed electrolyte volume [m^3] or larger volume
 
 % Concentration and time parameters
 C_max = 22800;         % Maximum intercalation concentration [mol m^-3]
